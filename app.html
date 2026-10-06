@@ -269,7 +269,7 @@ function recText(r){
 }
 function updInfo(){
  if(!rows.length){$("recInfo").textContent="Upload an Excel file first.";return}
- $("recInfo").textContent=$("q").value.trim()?`${hits.length} record(s) found: their labels are shown. No need to tick checkboxes.`:pick.size?`${pick.size} record(s) selected: only these will print.`:`Nothing selected: all ${rows.length} records will print.`;
+ $("recInfo").textContent=$("q").value.trim()?`${hits.length} record(s) found and shown. Use "Select all results" to keep them selected, then search more.`:pick.size?`${pick.size} record(s) selected: only these will print.`:`Nothing selected: all ${rows.length} records will print.`;
 }
 function renderRecs(){
  const q=$("q").value.trim().toLowerCase();
@@ -286,8 +286,8 @@ $("recList").addEventListener("input",e=>{
  else return;
  updInfo();rq();
 });
-$("selAll").onclick=()=>{hits.forEach(i=>pick.set(i,copyOf(i)));renderRecs();render()};
-$("selNone").onclick=()=>{pick.clear();renderRecs();render()};
+$("selAll").onclick=()=>{if(!hits.length)return;hits.forEach(i=>pick.set(i,copyOf(i)));$("q").value="";renderRecs();render()};
+$("selNone").onclick=()=>{pick.clear();$("q").value="";renderRecs();render()};
 
 function render(full){
  if(!rows.length){$("paperEl").style.cssText="background:none;box-shadow:none;padding:0;width:auto";$("sheet").style.cssText="display:block";
