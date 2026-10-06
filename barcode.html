@@ -37,7 +37,7 @@ svg.bc{width:100%;flex:1;min-height:0}
 .err{font:12px Arial;color:#b00;padding:4px;text-align:center}
 .empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
-@media print{.top{display:none}body{background:#fff}.app{display:block}aside,.bar,.empty{display:none}main{padding:0}
+@media print{.top{display:none}html,body{height:auto}.app{min-height:0}main{overflow:visible}body{background:#fff}.app{display:block}aside,.bar,.empty{display:none}main{padding:0}
 .paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}.cell{outline:none}.pg{box-shadow:none;margin:0}}
 </style><style id="pageStyle"></style></head><body>
 <nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l" href="/app">Excel labels</a><a class="l on" href="/barcode">Real-time barcode</a></nav>
@@ -93,7 +93,7 @@ function render(){
  if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly.</div>';return}
  const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm">${x.t?`<div class="t" style="font-size:${fs}pt">${esc(x.t)}</div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg></div>`;
  if(per){P.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";S.style.cssText="display:block";
-  S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH}mm;padding:${mg}mm">${cell(x)}</div>`).join("")}
+  S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm">${cell(x)}</div>`).join("")}
  else{P.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;S.style.cssText=`display:flex;flex-wrap:wrap;gap:${gap}mm;align-content:flex-start;width:${PW-2*mg}mm`;S.innerHTML=items.map(cell).join("")}
  const cache=new Map();
  document.querySelectorAll("svg.bc").forEach(s=>{const v=s.dataset.v;let c=cache.get(v);
