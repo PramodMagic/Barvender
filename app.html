@@ -51,6 +51,7 @@ main{padding:18px;overflow:auto}
 .t-box{border:1.2px solid #000;padding:1.2mm 1.6mm;display:flex;flex-direction:column;justify-content:space-between}
 .am{padding:1.5mm 2mm;line-height:1.2;display:flex;flex-direction:column;justify-content:space-between}
 .am .bcw svg{width:92%;height:auto}
+.bcw svg{margin:0 auto;display:block}
 .clamp2,.clamp3{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
 .clamp2{-webkit-line-clamp:2}.clamp3{-webkit-line-clamp:3}
 .nm{font-weight:700;line-height:1.15}
@@ -113,6 +114,7 @@ main{padding:18px;overflow:auto}
  <details open><summary>4. Paper &amp; label size</summary><div class="body">
   <label>Layout mode</label>
   <select id="mode"><option value="page">Per paper: fixed labels on each paper (roll / thermal)</option><option value="flow">Sheet: labels flow across the page (A4 etc.)</option></select>
+  <label class="chk" style="margin:8px 0 2px"><input type="checkbox" id="auto" checked> Auto layout: margin, labels per row and centering are set automatically</label>
   <div id="pageOpts" style="margin-top:6px">
    <div class="row"><div><label>Labels per row</label><input type="number" id="cpr" value="2" min="1"></div><div><label>Rows per paper</label><input type="number" id="rpp" value="1" min="1"></div></div>
    <label class="chk"><input type="checkbox" id="rep"> Fill each paper with the same label (always on while searching)</label>
@@ -300,8 +302,12 @@ function render(full){
  const m2=$("mode").value==="page";
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
  $("customPaper").hidden=$("paper").value!=="custom";$("pageOpts").hidden=!m2;
- const lw=+$("lw").value,lh=+$("lh").value,gap=+$("gap").value,mg=+$("mg").value,fs=+$("fs").value;
- const per=Math.max(1,+$("cpr").value||1)*Math.max(1,+$("rpp").value||1);
+ const lw=+$("lw").value,lh=+$("lh").value,gap=+$("gap").value,fs=+$("fs").value;
+ const AU=m2&&$("auto").checked,mg=AU?0:+$("mg").value;
+ const fit=(P,l,g)=>{let c=Math.max(1,Math.floor((P+.5)/l));while(c>1&&c*l+(c-1)*g>P+.5)c--;return c};
+ const cN=AU?fit(PW,lw,gap):Math.max(1,+$("cpr").value||1),rN=AU?fit(PH,lh,gap):Math.max(1,+$("rpp").value||1);
+ const gx=AU&&cN>1?Math.max(0,Math.min(gap,(PW-cN*lw)/(cN-1))):gap,gy=AU&&rN>1?Math.max(0,Math.min(gap,(PH-rN*lh)/(rN-1))):gap;
+ const per=cN*rN;$("cpr").disabled=$("rpp").disabled=$("mg").disabled=AU;
  $("pageStyle").textContent=m2?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
  $("userCss").textContent=$("cssBox").value;
  const paper=$("paperEl");
@@ -330,10 +336,10 @@ function render(full){
  else{
   html="";pages=0;
   for(let i=0;i<items.length;i+=per){pages++;
-   html+=`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm;gap:${gap}mm">${items.slice(i,i+per).join("")}</div>`}
+   html+=`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm;gap:${gy}mm ${gx}mm${AU?";align-content:center":""}">${items.slice(i,i+per).join("")}</div>`}
  }
  $("sheet").innerHTML=html;
- $("count").textContent=`${n} labels · ${use?use.size:rows.length} records · ${keys.length} template(s)`+(m2?` · ${Math.ceil(total/per)} paper(s), ${per} label/paper`:"");
+ $("count").textContent=`${n} labels · ${use?use.size:rows.length} records · ${keys.length} template(s)`+(m2?` · ${Math.ceil(total/per)} paper(s), ${per} label/paper${AU?` (auto: ${cN} across × ${rN} down)`:""}`:"");
  if(limited)$("count").textContent+=` · preview shows first ${MAX} labels, Print includes all`;
  const type=$("bcType").value,bcache=new Map(),opts={format:type,displayValue:$("bcText").checked,height:+$("bh").value*3.78,width:1.4,margin:0,fontSize:12,fontOptions:"bold"};
  document.querySelectorAll(".bcode").forEach(s=>{
@@ -363,7 +369,7 @@ let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
 $("pre1").onclick=()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value;$("mode").value="page";$("paper").value="custom";$("pw").value=$("lw").value;$("ph").value=$("lh").value;$("cpr").value=1;$("rpp").value=1;$("mg").value=0;$("gap").value=0;render()};
 $("pre2").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("ph").value=$("lh").value;$("cpr").value=2;$("rpp").value=1;$("mg").value=0;$("gap").value=2;$("pw").value=Math.max(rollW,2*(+$("lw").value)+2);render()};
-["ip","sx","sy","mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
+["auto","ip","sx","sy","mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
 $("printBtn").onclick=()=>window.print();
 window.addEventListener("beforeprint",()=>render(true));window.addEventListener("afterprint",()=>{calib=false;render()});
 $("calBtn").onclick=()=>{$("mode").value="page";calib=true;render(true);window.print()};
