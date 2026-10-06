@@ -124,7 +124,9 @@ main{padding:18px;overflow:auto}
   <div class="row" id="customPaper"><div><label>Paper width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div><label>Paper height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
   <div class="row"><div><label>Label width mm</label><input type="number" id="lw" value="50"></div><div><label>Label height mm</label><input type="number" id="lh" value="38"></div></div>
   <div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="0"></div></div>
+  <div class="row"><div><label>Inner padding mm</label><input type="number" id="ip" step="0.5" placeholder="auto"></div><div></div></div>
   <div class="row"><div><label>Shift X mm (alignment)</label><input type="number" id="sx" value="0" step="0.1"></div><div><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div></div>
+  <button class="alt" id="calBtn" style="margin:2px 0 8px;width:100%">Print calibration test label</button>
   <div class="row"><div><label>Font size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div><div><label>Barcode height mm</label><input type="number" id="bh" value="14"></div></div>
   <label class="chk"><input type="checkbox" id="fit" checked> Auto-fit text inside the label (barcode stays visible)</label>
   <label class="chk"><input type="checkbox" id="guide" checked> Show guide border in preview</label>
@@ -289,6 +291,9 @@ $("recList").addEventListener("input",e=>{
 $("selAll").onclick=()=>{if(!hits.length)return;hits.forEach(i=>pick.set(i,copyOf(i)));$("q").value="";renderRecs();render()};
 $("selNone").onclick=()=>{pick.clear();$("q").value="";renderRecs();render()};
 
+let calib=false;
+function CAL(w,h,sh){let t="";for(let y=5;y<h;y+=5)t+=`<div style="position:absolute;left:0;top:${y}mm;width:3mm;border-top:.2mm solid #000"></div><div style="position:absolute;left:4mm;top:${y-1.3}mm;font:6pt Arial">${y}</div>`;
+ return `<div class="lbl" style="width:${w}mm;height:${h}mm;flex:none;border:.3mm solid #000${sh}"><div style="position:absolute;top:.5mm;left:50%;font:7pt Arial;transform:translateX(-50%)">TOP edge</div><div style="position:absolute;bottom:.5mm;left:50%;font:7pt Arial;transform:translateX(-50%)">BOTTOM edge</div>${t}</div>`}
 function render(full){
  if(!rows.length){$("paperEl").style.cssText="background:none;box-shadow:none;padding:0;width:auto";$("sheet").style.cssText="display:block";
   $("sheet").innerHTML='<div class="empty">Upload an Excel / CSV file and your labels will appear here.</div>';$("count").textContent="No data";return}
@@ -306,6 +311,7 @@ function render(full){
  let items=[],total=0,limited=false;const MAX=full===true?1e9:40;
  const use=$("q").value.trim()?new Set(hits):pick.size?new Set(pick.keys()):null;
  const fill=m2&&($("rep").checked||!!$("q").value.trim());
+ const pd=$("ip").value!==""?`;padding:${+$("ip").value}mm`:"";
  const sh=(+$("sx").value||+$("sy").value)?`;transform:translate(${+$("sx").value||0}mm,${+$("sy").value||0}mm)`:"";
  const qC=$("mQty").value;
  for(let ri=0;ri<rows.length;ri++){
@@ -315,10 +321,11 @@ function render(full){
   for(let j=0;j<glen+pad;j++){const k=keys[(j%glen)%keys.length];
    total++;if(items.length>=MAX){limited=true;continue}
    const inner=k==="__c"?custom(r):TEMPLATES[k].h(d), cls=k==="__c"?"":TEMPLATES[k].css;
-   items.push(`<div class="lbl ${cls} ${$("guide").checked?"guide":""}" style="width:${lw}mm;height:${lh}mm;font-size:${fs}pt;flex:none${sh}">${inner}</div>`);
+   items.push(`<div class="lbl ${cls} ${$("guide").checked?"guide":""}" style="width:${lw}mm;height:${lh}mm;font-size:${fs}pt;flex:none${sh}${pd}">${inner}</div>`);
   }
  }
  const n=total;let pages=1,html;
+ if(calib&&m2)items=Array(+$("cpr").value*+$("rpp").value||1).fill(CAL(lw,lh,sh));
  if(!m2)html=items.join("");
  else{
   html="";pages=0;
@@ -356,9 +363,10 @@ let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
 $("pre1").onclick=()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value;$("mode").value="page";$("paper").value="custom";$("pw").value=$("lw").value;$("ph").value=$("lh").value;$("cpr").value=1;$("rpp").value=1;$("mg").value=0;$("gap").value=0;render()};
 $("pre2").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("ph").value=$("lh").value;$("cpr").value=2;$("rpp").value=1;$("mg").value=0;$("gap").value=2;$("pw").value=Math.max(rollW,2*(+$("lw").value)+2);render()};
-["sx","sy","mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
+["ip","sx","sy","mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
 $("printBtn").onclick=()=>window.print();
-window.addEventListener("beforeprint",()=>render(true));window.addEventListener("afterprint",()=>render());
+window.addEventListener("beforeprint",()=>render(true));window.addEventListener("afterprint",()=>{calib=false;render()});
+$("calBtn").onclick=()=>{$("mode").value="page";calib=true;render(true);window.print()};
 buildTplList();buildCols();renderRecs();render();
 </script>
 </body>
