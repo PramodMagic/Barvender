@@ -4,9 +4,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <style>
 :root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
-*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+*{box-sizing:border-box}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:4px;padding:0 16px;height:48px;background:#fff;border-bottom:1px solid var(--line)}
+.top .logo{font:700 18px Georgia,serif;margin-right:auto;text-decoration:none;color:var(--ink)}
+.top a.l{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px}
+.top a.l:hover{background:var(--brand2)}.top a.on{background:var(--brand2);color:var(--brand)}
+body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
 .app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
-aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:calc(100vh - 48px);position:sticky;top:48px}
 h1{font-size:20px;margin:0 0 2px}.sub{color:var(--mute);margin:0 0 12px;font-size:13px}
 details{border:1px solid var(--line);border-radius:6px;margin-bottom:10px}
 summary{padding:9px 12px;font-weight:600;cursor:pointer;background:var(--brand2);border-radius:6px}
@@ -32,11 +37,11 @@ svg.bc{width:100%;flex:1;min-height:0}
 .err{font:12px Arial;color:#b00;padding:4px;text-align:center}
 .empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
-@media print{body{background:#fff}.app{display:block}aside,.bar,.empty{display:none}main{padding:0}
+@media print{.top{display:none}body{background:#fff}.app{display:block}aside,.bar,.empty{display:none}main{padding:0}
 .paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}.cell{outline:none}.pg{box-shadow:none;margin:0}}
 </style><style id="pageStyle"></style></head><body>
+<nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l" href="/app">Excel labels</a><a class="l on" href="/barcode">Real-time barcode</a></nav>
 <div class="app"><aside>
-<a href="/" style="color:var(--brand);text-decoration:none;font-size:12.5px">← Home</a> · <a href="/app" style="color:var(--brand);font-size:12.5px">Excel labels</a>
 <h1>Real-time Barcode</h1><p class="sub">Pick a paper, type or scan, and print.</p>
 
 <details open><summary>1. Paper</summary><div class="body">

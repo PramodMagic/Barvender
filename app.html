@@ -9,9 +9,14 @@
 <style>
 :root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
 *{box-sizing:border-box}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:4px;padding:0 16px;height:48px;background:#fff;border-bottom:1px solid var(--line)}
+.top .logo{font:700 18px Georgia,serif;margin-right:auto;text-decoration:none;color:var(--ink)}
+.top a.l{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px}
+.top a.l:hover{background:var(--brand2)}.top a.on{background:var(--brand2);color:var(--brand)}
+
 body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
 .app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
-aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:calc(100vh - 48px);position:sticky;top:48px}
 h1{font-size:20px;margin:0 0 2px}
 .sub{color:var(--mute);margin:0 0 14px;font-size:13px}
 details{border:1px solid var(--line);border-radius:6px;margin-bottom:10px}
@@ -56,7 +61,7 @@ main{padding:18px;overflow:auto}
 .bcw{display:flex;justify-content:center;align-items:center}
 .sp{display:flex;justify-content:space-between;align-items:center;gap:2mm}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
-@media print{
+@media print{.top{display:none}
  .empty{display:none}
  body{background:#fff}.app{display:block}aside,.bar{display:none}
  main{padding:0}.paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}
@@ -67,9 +72,9 @@ main{padding:18px;overflow:auto}
 <style id="userCss"></style>
 </head>
 <body>
+<nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l on" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a></nav>
 <div class="app">
 <aside>
- <a href="/" style="color:var(--brand);text-decoration:none;font-size:12.5px">← Home</a> · <a href="/barcode" style="color:var(--brand);font-size:12.5px">Real-time barcode</a>
  <h1>Label Studio</h1>
  <p class="sub">Create MRP and barcode labels from Excel.</p>
 

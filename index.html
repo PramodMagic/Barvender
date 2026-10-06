@@ -6,11 +6,11 @@
 :root{--bg:#f6f3ec;--ink:#14231c;--mute:#56645c;--brand:#0f6b4f;--card:#fff;--line:#ddd8cb}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
 a{color:inherit}.w{max-width:1040px;margin:0 auto;padding:0 20px}
-nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0}
+nav{position:sticky;top:0;z-index:20;background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:18px 0}
 .logo{font:700 20px Georgia,serif;text-decoration:none}
 .btn{display:inline-block;padding:12px 22px;border-radius:8px;background:var(--brand);color:#fff;text-decoration:none;font-weight:600;border:2px solid var(--brand)}
 .btn.o{background:transparent;color:var(--brand)}.btn:focus-visible{outline:3px solid #e08a00;outline-offset:2px}
-.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding:48px 0 64px}
+.hero{max-width:760px;padding:56px 0 72px}
 h1{font:700 clamp(32px,5vw,52px)/1.1 Georgia,serif;margin:0 0 16px}h2{font:700 30px Georgia,serif;margin:0 0 24px}
 .lead{color:var(--mute);font-size:18px;margin:0 0 26px}.cta{display:flex;gap:12px;flex-wrap:wrap}
 .lbl{background:#fff;border:1px solid var(--line);box-shadow:6px 6px 0 var(--brand);padding:16px;font:13px/1.35 Arial,sans-serif;transform:rotate(-2deg)}
@@ -25,12 +25,12 @@ details{background:#fff;border:1px solid var(--line);border-radius:8px;padding:1
 footer{padding:30px 0;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
 @media(max-width:760px){.hero{grid-template-columns:1fr}}
 </style></head><body><div class="w">
-<nav><a class="logo" href="/">Label Studio</a><span><a href="/barcode" style="margin-right:18px;text-decoration:none;font-weight:600">Real-time barcode</a><a class="btn o" href="/app">Open the tool</a></span></nav>
+<nav><a class="logo" href="/">Label Studio</a><span><a href="/app" style="margin-right:18px;text-decoration:none;font-weight:600">Excel labels</a><a href="/barcode" style="margin-right:18px;text-decoration:none;font-weight:600">Real-time barcode</a><a class="btn o" href="/app">Open the tool</a></span></nav>
 <header class="hero"><div>
 <h1>From Excel sheet to print-ready labels in seconds.</h1>
 <p class="lead">Create MRP and barcode labels from any spreadsheet. Pick your columns, choose a template, and print on rolls or A4. Your data never leaves your browser.</p>
 <div class="cta"><a class="btn" href="/app">Start making labels</a><a class="btn o" href="#pricing">See pricing</a></div></div>
-<div class="lbl" aria-hidden="true"><b>Brand Name : Petjoy</b><br>Product : Adjustable Strap Harness (M, Black)<br><b>SKU ID : PJMS106</b><br>Asin : B0FY38F19S<br><b>MRP : 398</b><div class="bc"></div><div style="text-align:center;font-weight:700;font-family:monospace">X002JNFQHV</div></div></header>
+</header>
 <section><h2>Everything you need for label printing</h2><div class="g">
 <div class="c"><h3>Works with any Excel</h3><p>Upload .xlsx or .csv. Every column becomes an attribute you can show, rename, bold or reorder.</p></div>
 <div class="c"><h3>MRP and barcode templates</h3><p>Several ready layouts, plus your own HTML and CSS for a fully custom look.</p></div>
