@@ -352,8 +352,10 @@ function render(full){
  }
 }
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
-$("pre1").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("pw").value=$("lw").value;$("ph").value=$("lh").value;$("cpr").value=1;$("rpp").value=1;$("mg").value=0;$("gap").value=0;render()};
-$("pre2").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("ph").value=$("lh").value;$("cpr").value=2;$("rpp").value=1;$("mg").value=0;$("gap").value=2;render()};
+let rollW=+$("pw").value||104.8;
+$("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
+$("pre1").onclick=()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value;$("mode").value="page";$("paper").value="custom";$("pw").value=$("lw").value;$("ph").value=$("lh").value;$("cpr").value=1;$("rpp").value=1;$("mg").value=0;$("gap").value=0;render()};
+$("pre2").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("ph").value=$("lh").value;$("cpr").value=2;$("rpp").value=1;$("mg").value=0;$("gap").value=2;$("pw").value=Math.max(rollW,2*(+$("lw").value)+2);render()};
 ["sx","sy","mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
 $("printBtn").onclick=()=>window.print();
 window.addEventListener("beforeprint",()=>render(true));window.addEventListener("afterprint",()=>render());
