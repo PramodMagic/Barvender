@@ -57,7 +57,7 @@ svg.bc{width:100%;flex:1;min-height:0}
 </div></details>
 
 <details open><summary>2. Type or scan</summary><div class="body">
-<label>Barcode value (scanner works here, Enter adds it)</label>
+<label>Barcode value (type or scan)</label>
 <input type="text" id="val" autocomplete="off" autofocus placeholder="Type or scan…">
 <label>Title above barcode (optional)</label><input type="text" id="ttl" autocomplete="off">
 <div class="row"><div><label>Copies</label><input type="number" id="cpy" value="1" min="1"></div>
@@ -65,8 +65,7 @@ svg.bc{width:100%;flex:1;min-height:0}
 <label class="chk" style="margin:8px 0"><input type="checkbox" id="txt" checked> Show number below barcode</label>
 <label>Number font size (pt) — text below barcode</label><input type="number" id="nf" value="10" step="0.5">
 <label>Title font size (pt) — text above barcode</label><input type="number" id="fs" value="9" step="0.5">
-<div class="row" style="margin-top:8px"><button id="add">Add to queue</button><button class="alt" id="clr">Clear queue</button></div>
-<div class="q" id="list"></div>
+<p class="sub" style="margin:10px 0 0">Press <b>Enter</b> (or scan) to print right away.</p>
 </div></details>
 </aside>
 <main><div class="bar"><div class="info" id="count"></div><button id="printBtn">Print / PDF</button></div>
@@ -77,8 +76,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 let q=[];
 const fmtFor=v=>{const f=$("fmt").value;return f!=="AUTO"?f:/^\d{13}$/.test(v)?"EAN13":/^\d{12}$/.test(v)?"UPC":/^\d{8}$/.test(v)?"EAN8":"CODE128"};
 const draft=()=>{const v=$("val").value.trim();return v?{v,t:$("ttl").value.trim(),n:Math.max(1,+$("cpy").value||1)}:null};
-function commit(){const d=draft();if(!d)return;q.push(d);$("val").value="";renderList();render();$("val").focus()}
-function renderList(){$("list").innerHTML=q.map((x,i)=>`<div class="rrow"><span title="${esc(x.v)}">${esc(x.v)}${x.t?" · "+esc(x.t):""}</span><input class="cp" type="number" min="1" value="${x.n}" data-n="${i}" aria-label="Copies"><button class="alt" data-x="${i}" aria-label="Remove">✕</button></div>`).join("")||'<p class="sub" style="margin:8px 0">Queue is empty. Type or scan, then press Enter to add.</p>'}
+function commit(){if(!draft())return;render();window.print()}
+window.addEventListener("afterprint",()=>{$("val").focus();$("val").select()});
 function gen(s,v){const auto=$("fmt").value==="AUTO";let f=fmtFor(v);
  const o=()=>({format:f,displayValue:false,height:60,width:2,margin:0,marginLeft:10,marginRight:10});
  try{JsBarcode(s,v,o())}catch(e){if(auto&&f!=="CODE128"){f="CODE128";try{JsBarcode(s,v,o())}catch(e2){return{err:1,f}}}else return{err:1,f}}
@@ -92,7 +91,7 @@ function render(){
  $("pageStyle").textContent=per?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
  const P=$("paperEl"),S=$("sheet");
  $("count").textContent=items.length?`${items.length} barcode(s)`+(d?" · live preview of what you are typing":""):"Nothing to print yet";
- if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly.</div>';return}
+ if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly. Then press Print.</div>';return}
  const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm">${x.t?`<div class="t" style="font-size:${fs}pt">${esc(x.t)}</div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg>${$("txt").checked?`<div class="num" style="font-size:${nf}pt">${esc(x.v)}</div>`:""}</div>`;
  if(per){P.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";S.style.cssText="display:block";
   S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm">${cell(x)}</div>`).join("")}
@@ -104,11 +103,7 @@ function render(){
 }
 $("val").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
 $("ttl").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
-$("add").onclick=commit;
-$("clr").onclick=()=>{q=[];renderList();render()};
 $("printBtn").onclick=()=>window.print();
-$("list").addEventListener("input",e=>{const i=e.target.dataset.n;if(i!==undefined){q[i].n=Math.max(1,+e.target.value||1);render()}});
-$("list").addEventListener("click",e=>{const i=e.target.dataset.x;if(i!==undefined){q.splice(+i,1);renderList();render()}});
 ["paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","fs","nf"].forEach(id=>$(id).addEventListener("input",render));
-renderList();render();
+render();
 </script></body></html>
