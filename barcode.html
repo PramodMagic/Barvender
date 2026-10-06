@@ -30,6 +30,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 main{padding:18px;overflow:auto}.bar{display:flex;gap:10px;align-items:center;margin-bottom:12px}.bar .info{flex:1;color:var(--mute)}
 .paper{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto;width:fit-content}
 .cell{display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:1mm;flex:none;font-family:Arial,sans-serif;color:#000;outline:1px dashed #bbb}
+.num{font-weight:700;text-align:center;line-height:1.1;margin-top:.5mm;word-break:break-all}
 .t{font-weight:700;text-align:center;line-height:1.15;margin-bottom:.5mm}
 svg.bc{width:100%;flex:1;min-height:0}
 .pg{break-after:page;page-break-after:always;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;overflow:hidden}
@@ -62,7 +63,8 @@ svg.bc{width:100%;flex:1;min-height:0}
 <div class="row"><div><label>Copies</label><input type="number" id="cpy" value="1" min="1"></div>
 <div><label>Barcode type</label><select id="fmt"><option value="AUTO">Auto</option><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option><option>ITF14</option></select></div></div>
 <label class="chk" style="margin:8px 0"><input type="checkbox" id="txt" checked> Show number below barcode</label>
-<label>Title font size (pt)</label><input type="number" id="fs" value="9" step="0.5">
+<label>Number font size (pt) — text below barcode</label><input type="number" id="nf" value="10" step="0.5">
+<label>Title font size (pt) — text above barcode</label><input type="number" id="fs" value="9" step="0.5">
 <div class="row" style="margin-top:8px"><button id="add">Add to queue</button><button class="alt" id="clr">Clear queue</button></div>
 <div class="q" id="list"></div>
 </div></details>
@@ -78,20 +80,20 @@ const draft=()=>{const v=$("val").value.trim();return v?{v,t:$("ttl").value.trim
 function commit(){const d=draft();if(!d)return;q.push(d);$("val").value="";renderList();render();$("val").focus()}
 function renderList(){$("list").innerHTML=q.map((x,i)=>`<div class="rrow"><span title="${esc(x.v)}">${esc(x.v)}${x.t?" · "+esc(x.t):""}</span><input class="cp" type="number" min="1" value="${x.n}" data-n="${i}" aria-label="Copies"><button class="alt" data-x="${i}" aria-label="Remove">✕</button></div>`).join("")||'<p class="sub" style="margin:8px 0">Queue is empty. Type or scan, then press Enter to add.</p>'}
 function gen(s,v){const auto=$("fmt").value==="AUTO";let f=fmtFor(v);
- const o=()=>({format:f,displayValue:$("txt").checked,height:60,width:2,margin:6,fontSize:16,fontOptions:"bold"});
+ const o=()=>({format:f,displayValue:false,height:60,width:2,margin:0,marginLeft:10,marginRight:10});
  try{JsBarcode(s,v,o())}catch(e){if(auto&&f!=="CODE128"){f="CODE128";try{JsBarcode(s,v,o())}catch(e2){return{err:1,f}}}else return{err:1,f}}
  return{h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
 function render(){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
  $("cust").hidden=$("paper").value!=="custom";
- const per=$("mode").value==="page",mg=+$("mg").value,gap=+$("gap").value,fs=+$("fs").value;
+ const per=$("mode").value==="page",mg=+$("mg").value,gap=+$("gap").value,fs=+$("fs").value,nf=+$("nf").value||10;
  const W=per?PW-2*mg:+$("cw").value,H=per?PH-2*mg:+$("ch").value;
  const items=[];q.forEach(x=>{for(let i=0;i<x.n;i++)items.push(x)});const d=draft();if(d)for(let i=0;i<d.n;i++)items.push(d);
  $("pageStyle").textContent=per?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
  const P=$("paperEl"),S=$("sheet");
  $("count").textContent=items.length?`${items.length} barcode(s)`+(d?" · live preview of what you are typing":""):"Nothing to print yet";
  if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly.</div>';return}
- const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm">${x.t?`<div class="t" style="font-size:${fs}pt">${esc(x.t)}</div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg></div>`;
+ const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm">${x.t?`<div class="t" style="font-size:${fs}pt">${esc(x.t)}</div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg>${$("txt").checked?`<div class="num" style="font-size:${nf}pt">${esc(x.v)}</div>`:""}</div>`;
  if(per){P.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";S.style.cssText="display:block";
   S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm">${cell(x)}</div>`).join("")}
  else{P.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;S.style.cssText=`display:flex;flex-wrap:wrap;gap:${gap}mm;align-content:flex-start;width:${PW-2*mg}mm`;S.innerHTML=items.map(cell).join("")}
@@ -107,6 +109,6 @@ $("clr").onclick=()=>{q=[];renderList();render()};
 $("printBtn").onclick=()=>window.print();
 $("list").addEventListener("input",e=>{const i=e.target.dataset.n;if(i!==undefined){q[i].n=Math.max(1,+e.target.value||1);render()}});
 $("list").addEventListener("click",e=>{const i=e.target.dataset.x;if(i!==undefined){q.splice(+i,1);renderList();render()}});
-["paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","fs"].forEach(id=>$(id).addEventListener("input",render));
+["paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","fs","nf"].forEach(id=>$(id).addEventListener("input",render));
 renderList();render();
 </script></body></html>
