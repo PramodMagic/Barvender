@@ -1,354 +1,52 @@
 <!DOCTYPE html>
-<html lang="hi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Label Studio – MRP & Barcode</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Studio – MRP & Barcode Label Maker from Excel</title>
+<meta name="description" content="Turn any Excel sheet into print-ready MRP and barcode labels. Multiple templates, roll and A4 support. Your data never leaves your browser.">
 <style>
-:root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
-*{box-sizing:border-box}
-body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
-.app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
-aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
-h1{font-size:20px;margin:0 0 2px}
-.sub{color:var(--mute);margin:0 0 14px;font-size:13px}
-details{border:1px solid var(--line);border-radius:6px;margin-bottom:10px}
-summary{padding:9px 12px;font-weight:600;cursor:pointer;background:var(--brand2);border-radius:6px}
-details[open] summary{border-radius:6px 6px 0 0}
-.body{padding:10px 12px}
-label{display:block;margin:6px 0 2px;font-size:12.5px;color:var(--mute)}
-.chk{display:flex;align-items:center;gap:7px;margin:4px 0;color:var(--ink);font-size:13.5px;cursor:pointer}
-input[type=text],input[type=number],select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font:inherit;background:#fff}
-textarea{font-family:Consolas,monospace;font-size:12px;min-height:90px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-button{font:inherit;padding:8px 12px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer;font-weight:600}
-button.alt{background:#fff;color:var(--brand)}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #e08a00;outline-offset:1px}
-.drop{border:2px dashed var(--brand);border-radius:8px;padding:14px;text-align:center;background:var(--brand2);cursor:pointer}
-.drop.on{background:#d3ebe1}
-.crow{border-bottom:1px solid var(--line);padding:4px 0}.cctl{display:flex;gap:4px;align-items:center}.cctl input[type=text]{flex:1;min-width:0;padding:3px 5px}.cctl select{width:68px;padding:3px}.cctl button{padding:2px 7px}.cctl .chk{margin:0}
-.rrow{display:flex;gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:3px 0}.rrow .chk{flex:1;min-width:0;margin:0}.rrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cp{width:58px!important;padding:3px 4px!important}
-.cols{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:4px 8px}
-main{padding:18px;overflow:auto}
-.bar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.bar .info{color:var(--mute);flex:1}
-.paper{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto;width:fit-content}
-.sheet{display:flex;flex-wrap:wrap;align-content:flex-start}
-.empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
-.pg{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;overflow:hidden;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;break-after:page;page-break-after:always}
-.pg:last-child{break-after:auto;page-break-after:auto}
-.lbl{overflow:hidden;position:relative;break-inside:avoid;page-break-inside:avoid;font-family:Arial,sans-serif;color:#000}
-.lbl svg{max-width:100%}
-.lbl.guide{outline:1px dashed #bbb}
-/* template styles */
-.t-box{border:1.2px solid #000;padding:1.2mm 1.6mm;display:flex;flex-direction:column;justify-content:space-between}
-.am{padding:1.5mm 2mm;line-height:1.2;display:flex;flex-direction:column;justify-content:space-between}
-.am .bcw svg{width:92%;height:auto}
-.clamp2,.clamp3{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
-.clamp2{-webkit-line-clamp:2}.clamp3{-webkit-line-clamp:3}
-.nm{font-weight:700;line-height:1.15}
-.ex{font-size:.78em;line-height:1.25}
-.mrp{font-weight:700}
-.big{font-size:2.1em;font-weight:800;line-height:1}
-.ctr{text-align:center}
-.bcw{display:flex;justify-content:center;align-items:center}
-.sp{display:flex;justify-content:space-between;align-items:center;gap:2mm}
-@media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
-@media print{
- .empty{display:none}
- body{background:#fff}.app{display:block}aside,.bar{display:none}
- main{padding:0}.paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}
- .lbl.guide{outline:none}.pg{box-shadow:none;margin:0}
-}
-</style>
-<style id="pageStyle"></style>
-<style id="userCss"></style>
-</head>
-<body>
-<div class="app">
-<aside>
- <h1>Label Studio</h1>
- <p class="sub">MRP aur Barcode labels, Excel se.</p>
-
- <details open><summary>1. Excel upload</summary><div class="body">
-  <div class="drop" id="drop" tabindex="0">Excel / CSV yahan drop karein ya click karein
-   <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div>
-  <p class="sub" id="fileInfo" style="margin:8px 0 6px">Abhi koi file upload nahi hui.</p>
-  <button class="alt" id="sampleBtn">Sample Excel download</button>
- </div></details>
-
- <details open><summary>Records: search aur select karke print</summary><div class="body">
-  <input type="text" id="q" placeholder="Search karte hi label ban jayega: SKU, ASIN, barcode, naam...">
-  <div class="row" style="margin-top:6px"><button class="alt" id="selAll">Search wale sab select</button><button class="alt" id="selNone">Selection clear</button></div>
-  <div class="cols" id="recList" style="margin-top:8px;max-height:260px"></div>
-  <p class="sub" id="recInfo" style="margin:6px 0 0"></p>
- </div></details>
-
- <details open><summary>2. Columns (attributes): show, label, bold, lines, order</summary><div class="body">
-  <div class="row"><button class="alt" id="allOn">Sab select</button><button class="alt" id="allOff">Sab hatayein</button></div>
-  <div class="cols" id="colList" style="margin-top:8px"></div>
-  <label>Name column</label><select id="mName"></select>
-  <label>MRP / price column</label><select id="mMrp"></select>
-  <label>Barcode column</label><select id="mBar"></select>
-  <label>Copies (qty) column</label><select id="mQty"></select>
- </div></details>
-
- <details open><summary>3. Templates</summary><div class="body">
-  <label>Ek paper par ek record ke liye kitne templates chahiye? Sab tick karein:</label>
-  <div id="tplList"></div>
-  <label>Barcode type</label>
-  <select id="bcType"><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option><option>ITF14</option></select>
-  <label>Label aur value ke beech separator</label><input type="text" id="sep" value=" : ">
-  <label class="chk"><input type="checkbox" id="bcText" checked> Barcode ke niche number dikhayein</label>
- </div></details>
-
- <details open><summary>4. Paper aur label size</summary><div class="body">
-  <label>Layout mode</label>
-  <select id="mode"><option value="page">Paper-wise: har paper par fixed labels (roll / thermal)</option><option value="flow">Sheet: labels poore paper me flow (A4 etc.)</option></select>
-  <div id="pageOpts" style="margin-top:6px">
-   <div class="row"><div><label>Labels ek row me</label><input type="number" id="cpr" value="2" min="1"></div><div><label>Rows ek paper me</label><input type="number" id="rpp" value="1" min="1"></div></div>
-   <label class="chk"><input type="checkbox" id="rep"> Ek hi label se poora paper bhar dein (repeat)</label>
-   <div class="row" style="margin-top:6px"><button class="alt" id="pre1">1 label / paper</button><button class="alt" id="pre2">2 labels / paper</button></div>
-   <p class="sub" style="margin:6px 0 0">Paper ke andar labels ki jagah: width &ge; labels x label width + gaps. Roll par margin 0 rakhein.</p>
-  </div>
-  <label>Paper</label>
-  <select id="paper"><option value="210,297">A4</option><option value="148,210">A5</option><option value="216,279">Letter</option><option value="custom" selected>Custom / Roll</option></select>
-  <div class="row" id="customPaper"><div><label>Paper width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div><label>Paper height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
-  <div class="row"><div><label>Label width mm</label><input type="number" id="lw" value="50"></div><div><label>Label height mm</label><input type="number" id="lh" value="38"></div></div>
-  <div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="0"></div></div>
-  <div class="row"><div><label>Font size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div><div><label>Barcode height mm</label><input type="number" id="bh" value="14"></div></div>
-  <label class="chk"><input type="checkbox" id="fit" checked> Auto-fit: text label ke andar apne aap adjust ho (barcode hamesha dikhe)</label>
-  <label class="chk"><input type="checkbox" id="guide" checked> Preview mein guide border</label>
- </div></details>
-
- <details><summary>5. Custom template / CSS (advanced)</summary><div class="body">
-  <label>Custom HTML template. Columns ke liye {{Column}}, barcode ke liye {{bc:Column}}</label>
-  <textarea id="customHtml" spellcheck="false">&lt;div class="nm"&gt;{{Product Name}}&lt;/div&gt;
-&lt;div class="mrp"&gt;MRP Rs. {{MRP}}&lt;/div&gt;
-{{bc:Barcode}}</textarea>
-  <label class="chk"><input type="checkbox" id="useCustom"> Custom template use karein</label>
-  <label>Custom CSS</label>
-  <textarea id="cssBox" spellcheck="false" placeholder=".lbl{border-radius:2mm}"></textarea>
- </div></details>
-</aside>
-
-<main>
- <div class="bar">
-  <div class="info" id="count"></div>
-  <button id="printBtn">Print / PDF</button>
- </div>
- <div class="paper" id="paperEl"><div class="sheet" id="sheet"></div></div>
-</main>
-</div>
-
-<script>
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let rows=[];
-let cols=[];
-let sel=new Set();
-
-/* ---------- Templates: yahan nayi templates add/edit kar sakte hain ---------- */
-const bc=(v,d)=>v?`<div class="bcw"><svg class="bcode" data-v="${esc(v)}"></svg></div>`:"";
-const TEMPLATES={
- am1:{n:"MRP – Dynamic list (Amazon style)",t:"MRP",css:"am",h:d=>{
-  const skip=[$("mBar").value,$("mQty").value], sep=$("sep").value;
-  const lines=cols.filter(c=>sel.has(c)&&!skip.includes(c)&&String(d.row[c]??"").trim()!=="").map(c=>{
-   const f=colCfg[c]||{label:c,bold:0,clamp:0};
-   const cl=f.clamp?`display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;-webkit-line-clamp:${f.clamp};`:"";
-   return `<div style="${cl}font-weight:${f.bold?700:400}">${esc(f.label)}${f.label?esc(sep):""}${esc(d.row[c])}</div>`}).join("");
-  return `<div>${lines}</div>${d.bar?`<div class="bcw" style="margin-top:1mm">${bc(d.bar)}</div>`:""}`}},
- m1:{n:"MRP – Classic box",t:"MRP",css:"t-box",h:d=>`<div><div class="nm">${d.name}</div><div class="ex">${d.extra}</div></div>${d.mrp?`<div class="mrp">MRP Rs. ${d.mrp} <span class="ex" style="font-weight:400">(incl. all taxes)</span></div>`:""}${d.bar?bc(d.bar):""}`},
- m2:{n:"MRP – Big price",t:"MRP",css:"t-box ctr",h:d=>`<div class="nm">${d.name}</div>${d.mrp?`<div><span class="ex">MRP Rs.</span> <span class="big">${d.mrp}</span></div>`:""}<div class="ex">${d.extra}</div>`},
- m3:{n:"MRP – Simple line",t:"MRP",css:"",h:d=>`<div class="nm">${d.name}</div><div class="ex">${d.extra}</div>${d.mrp?`<div class="mrp" style="font-size:1.25em">MRP Rs. ${d.mrp}</div>`:""}`},
- b1:{n:"Barcode – with name",t:"Barcode",css:"ctr",h:d=>`<div class="nm">${d.name}</div>${d.bar?bc(d.bar):""}<div class="ex">${d.extra}</div>`},
- b2:{n:"Barcode – only",t:"Barcode",css:"ctr",h:d=>`<div style="display:flex;height:100%;align-items:center;justify-content:center">${d.bar?bc(d.bar):"<i>Barcode column select karein</i>"}</div>`},
- b3:{n:"Barcode – with MRP (side by side)",t:"Barcode",css:"t-box",h:d=>`<div class="nm">${d.name}</div>${d.bar?bc(d.bar):""}<div class="sp"><span class="ex">${d.extra}</span>${d.mrp?`<span class="mrp">Rs. ${d.mrp}</span>`:""}</div>`}
-};
-const tplSel=new Set(["am1"]);
-function buildTplList(){
- let h="";
- for(const g of ["MRP","Barcode"]){
-  h+=`<div style="margin:6px 0 2px;font-weight:600">${g} templates</div>`;
-  for(const k in TEMPLATES)if(TEMPLATES[k].t===g)
-   h+=`<label class="chk"><input type="checkbox" data-t="${k}" ${tplSel.has(k)?"checked":""}> ${TEMPLATES[k].n}</label>`;
- }
- $("tplList").innerHTML=h;
- $("tplList").querySelectorAll("input").forEach(i=>i.onchange=()=>{i.checked?tplSel.add(i.dataset.t):tplSel.delete(i.dataset.t);render()});
-}
-
-/* ---------- columns UI ---------- */
-function guess(re){return cols.find(c=>re.test(c))||""}
-let colCfg={};
-function initCfg(){colCfg={};cols.forEach(c=>colCfg[c]={label:c,bold:/^(brand|sku|mrp)/i.test(c),clamp:/product|title|desc/i.test(c)?2:/import|mktd|address/i.test(c)?3:/care|contact/i.test(c)?2:0})}
-function renderColList(){
- $("colList").innerHTML=`<label class="chk" style="padding:3px 0"><input type="radio" name="bcsel" data-k="r0" ${$("mBar").value?"":"checked"}> Barcode nahi chahiye</label>`+cols.map((c,i)=>{const f=colCfg[c];return `<div class="crow"><div style="display:flex;justify-content:space-between;gap:6px"><label class="chk"><input type="checkbox" data-k="s" data-i="${i}" ${sel.has(c)?"checked":""}> <b>${esc(c)}</b></label>
- <label class="chk" title="Is column ki value ka barcode banayein" style="color:var(--brand);font-weight:600"><input type="radio" name="bcsel" data-k="r" data-i="${i}" ${$("mBar").value===c?"checked":""}>Barcode</label></div>
- <div class="cctl"><input type="text" data-k="l" data-i="${i}" value="${esc(f.label)}" title="Label me dikhne wala naam (khali = sirf value)">
- <label class="chk" title="Bold"><input type="checkbox" data-k="b" data-i="${i}" ${f.bold?"checked":""}>B</label>
- <select data-k="n" data-i="${i}" title="Max lines">${[0,1,2,3,4].map(n=>`<option value="${n}" ${f.clamp==n?"selected":""}>${n?n+" line":"All"}</option>`).join("")}</select>
- <button class="alt" data-k="u" data-i="${i}" title="Upar">↑</button><button class="alt" data-k="d" data-i="${i}" title="Neeche">↓</button></div></div>`}).join("");
-}
-$("colList").addEventListener("input",e=>{
- const t=e.target,k=t.dataset.k;if(!k)return;const c=cols[t.dataset.i];
- if(k==="r0"){$("mBar").value="";render();return}
- if(k==="r"){$("mBar").value=c;render();return}
- if(k==="s")t.checked?sel.add(c):sel.delete(c);
- if(k==="l")colCfg[c].label=t.value;
- if(k==="b")colCfg[c].bold=t.checked;
- if(k==="n")colCfg[c].clamp=+t.value;
- rq();
-});
-$("colList").addEventListener("click",e=>{
- const k=e.target.dataset.k,i=+e.target.dataset.i;if(k!=="u"&&k!=="d")return;
- const j=k==="u"?i-1:i+1;if(j<0||j>=cols.length)return;
- [cols[i],cols[j]]=[cols[j],cols[i]];renderColList();render();
-});
-function buildCols(){
- initCfg();
- const opts='<option value="">— none —</option>'+cols.map(c=>`<option>${esc(c)}</option>`).join("");
- [["mName",/product|title|item|desc/i],["mMrp",/mrp|price|rate|amount/i],["mBar",/barcode|fnsku|ean|upc/i],["mQty",/qty|copies|quantity|count/i]].forEach(([id,re])=>{
-  $(id).innerHTML=opts;$(id).value=guess(re)||(id==="mName"?guess(/name/i):id==="mBar"?guess(/sku|code/i):"");$(id).onchange=render;
- });
- $("mBar").onchange=()=>{renderColList();render()};renderColList();
-}
-
-/* ---------- data load ---------- */
-function loadFile(f){
- const r=new FileReader();
- r.onload=e=>{
-  const wb=XLSX.read(e.target.result,{type:"array"});
-  const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:false});
-  if(!data.length){$("fileInfo").textContent="File khali hai.";return}
-  rows=data;cols=Object.keys(rows[0]);sel=new Set(cols);
-  $("fileInfo").textContent=`${f.name}: ${rows.length} rows, ${cols.length} columns`;
-  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();
- };
- r.readAsArrayBuffer(f);
-}
-$("drop").onclick=()=>$("file").click();
-$("drop").onkeydown=e=>{if(e.key==="Enter")$("file").click()};
-$("file").onchange=e=>e.target.files[0]&&loadFile(e.target.files[0]);
-$("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("on")};
-$("drop").ondragleave=()=>$("drop").classList.remove("on");
-$("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("on");e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0])};
-$("sampleBtn").onclick=()=>{
- const ws=XLSX.utils.json_to_sheet([{"Product Name":"Cotton T-Shirt","MRP":499,"Barcode":"8901234567890","Size":"M","Brand":"UrbanFit","Qty":2},{"Product Name":"Steel Bottle","MRP":349,"Barcode":"8909876543210","Size":"750ml","Brand":"HydroMax","Qty":1}]);
- const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Labels");XLSX.writeFile(wb,"sample-labels.xlsx");
-};
-$("allOn").onclick=()=>{sel=new Set(cols);renderColList();render()};
-$("allOff").onclick=()=>{sel=new Set();renderColList();render()};
-
-/* ---------- render ---------- */
-function record(r){
- const g=id=>$(id).value, on=c=>c&&sel.has(c);
- const nameC=g("mName"),mrpC=g("mMrp"),barC=g("mBar"),used=[nameC,mrpC,barC,g("mQty")];
- const extra=cols.filter(c=>sel.has(c)&&!used.includes(c)).map(c=>`${esc(c)}: ${esc(r[c])}`).join(" | ");
- return{row:r,name:on(nameC)?esc(r[nameC]):"",mrp:on(mrpC)?esc(r[mrpC]):"",bar:barC?String(r[barC]??"").trim():"",extra};
-}
-function custom(r){
- return $("customHtml").value.replace(/\{\{bc:(.+?)\}\}/g,(_,c)=>bc(r[c.trim()])).replace(/\{\{(.+?)\}\}/g,(_,c)=>esc(r[c.trim()]));
-}
-/* ---------- records search / select ---------- */
-const pick=new Map(),cop=new Map();let hits=[],hay=null;
-const copyOf=i=>cop.get(i)||defCopies(i);
-function defCopies(i){const qC=$("mQty").value;return Math.max(1,parseInt(qC?rows[i][qC]:1)||1)}
-function recText(r){
- const n=$("mName").value,b=$("mBar").value;
- const t=[n&&r[n],b&&r[b]].filter(Boolean);
- return (t.length?t:Object.values(r).filter(v=>String(v).trim()).slice(0,3)).join(" · ");
-}
-function updInfo(){
- if(!rows.length){$("recInfo").textContent="Pehle Excel upload karein.";return}
- $("recInfo").textContent=$("q").value.trim()?`Search se ${hits.length} record mile: unhi ke labels neeche bane hain. Checkbox ki zarurat nahi.`:pick.size?`${pick.size} record select hai: sirf yehi print hongi.`:`Koi select nahi hai: sabhi ${rows.length} records print hongi.`;
-}
-function renderRecs(){
- const q=$("q").value.trim().toLowerCase();
- if(!hay)hay=rows.map(r=>Object.values(r).join("\u0001").toLowerCase());
- hits=[];for(let i=0;i<hay.length;i++)if(!q||hay[i].includes(q))hits.push(i);
- $("recList").innerHTML=hits.slice(0,200).map(i=>`<div class="rrow"><label class="chk"><input type="checkbox" data-r="${i}" ${pick.has(i)?"checked":""}><span title="${esc(recText(rows[i]))}">${esc(recText(rows[i]))}</span></label><input class="cp" type="number" min="1" data-n="${i}" value="${copyOf(i)}" title="Copies"></div>`).join("")||`<p class="sub">${rows.length?"Koi record nahi mila.":"Excel upload karne ke baad records yahan dikhenge."}</p>`;
- $("recInfo").dataset.hits=hits.length;updInfo();
-}
-let qt;$("q").addEventListener("input",()=>{clearTimeout(qt);qt=setTimeout(()=>{renderRecs();render()},180)});
-$("recList").addEventListener("input",e=>{
- const t=e.target;
- if(t.dataset.r!==undefined){const i=+t.dataset.r;if(t.checked)pick.set(i,copyOf(i));else pick.delete(i)}
- else if(t.dataset.n!==undefined){const i=+t.dataset.n,v=Math.max(1,+t.value||1);cop.set(i,v);if(pick.has(i))pick.set(i,v)}
- else return;
- updInfo();rq();
-});
-$("selAll").onclick=()=>{hits.forEach(i=>pick.set(i,copyOf(i)));renderRecs();render()};
-$("selNone").onclick=()=>{pick.clear();renderRecs();render()};
-
-function render(full){
- if(!rows.length){$("paperEl").style.cssText="background:none;box-shadow:none;padding:0;width:auto";$("sheet").style.cssText="display:block";
-  $("sheet").innerHTML='<div class="empty">Excel / CSV upload karein, labels yahan dikhenge.</div>';$("count").textContent="Koi data nahi";return}
- const m2=$("mode").value==="page";
- const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
- $("customPaper").hidden=$("paper").value!=="custom";$("pageOpts").hidden=!m2;
- const lw=+$("lw").value,lh=+$("lh").value,gap=+$("gap").value,mg=+$("mg").value,fs=+$("fs").value;
- const per=Math.max(1,+$("cpr").value||1)*Math.max(1,+$("rpp").value||1);
- $("pageStyle").textContent=m2?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
- $("userCss").textContent=$("cssBox").value;
- const paper=$("paperEl");
- if(m2){paper.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";$("sheet").style.cssText="display:block"}
- else{paper.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;$("sheet").style.cssText=`gap:${gap}mm;width:${PW-2*mg}mm`}
- const keys=$("useCustom").checked?["__c"]:[...tplSel].filter(k=>TEMPLATES[k]);
- let items=[],total=0,limited=false;const MAX=full===true?1e9:40;
- const use=$("q").value.trim()?new Set(hits):pick.size?new Set(pick.keys()):null;
- const qC=$("mQty").value;
- for(let ri=0;ri<rows.length;ri++){
-  const r=rows[ri];if(use&&!use.has(ri))continue;
-  const copies=use?(pick.get(ri)||copyOf(ri)):defCopies(ri), d=items.length>=MAX?null:record(r);
-  for(let i=0;i<copies;i++)for(const k of keys){
-   total++;if(items.length>=MAX){limited=true;continue}
-   const inner=k==="__c"?custom(r):TEMPLATES[k].h(d), cls=k==="__c"?"":TEMPLATES[k].css;
-   items.push(`<div class="lbl ${cls} ${$("guide").checked?"guide":""}" style="width:${lw}mm;height:${lh}mm;font-size:${fs}pt;flex:none">${inner}</div>`);
-  }
- }
- const n=total;let pages=1,html;
- if(!m2)html=items.join("");
- else{
-  if($("rep").checked)items=items.flatMap(x=>Array(per).fill(x));
-  html="";pages=0;
-  for(let i=0;i<items.length;i+=per){pages++;
-   html+=`<div class="pg" style="width:${PW}mm;height:${PH}mm;padding:${mg}mm;gap:${gap}mm">${items.slice(i,i+per).join("")}</div>`}
- }
- $("sheet").innerHTML=html;
- $("count").textContent=`${n} labels · ${use?use.size:rows.length} records · ${keys.length} template(s)`+(m2?` · ${Math.ceil(($("rep").checked?total*per:total)/per)} paper(s), ${per} label/paper`:"");
- if(limited)$("count").textContent+=` · preview me pehle ${MAX} labels, Print me sab aayenge`;
- const type=$("bcType").value,bcache=new Map(),opts={format:type,displayValue:$("bcText").checked,height:+$("bh").value*3.78,width:1.4,margin:0,fontSize:12,fontOptions:"bold"};
- document.querySelectorAll(".bcode").forEach(s=>{
-  const v=s.dataset.v;let c=bcache.get(v);
-  if(!c){
-   try{JsBarcode(s,v,opts);c={h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
-   catch(e){c={err:1}}
-   bcache.set(v,c);
-  }else if(!c.err){c.a.forEach(([n,x])=>s.setAttribute(n,x));s.innerHTML=c.h}
-  if(c.err)s.outerHTML=`<span class="ex" style="color:#b00">Invalid ${type}: ${esc(v)}</span>`;
- });
- if($("fit").checked){
-  const fc=new Map();
-  document.querySelectorAll(".lbl").forEach(l=>{
-   const key=l.innerHTML+l.className+l.style.cssText,sv=l.querySelector("svg.bcode"),hit=fc.get(key);
-   if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;return}
-   let f=parseFloat(l.style.fontSize),n=0;
-   while(l.scrollHeight>l.clientHeight+1&&f>3.5&&n++<8){f=Math.max(3.5,f*Math.max(.7,l.clientHeight/l.scrollHeight*.97));l.style.fontSize=f+"pt"}
-   let w=100;
-   while(sv&&l.scrollHeight>l.clientHeight+1&&w>35){w-=10;sv.style.width=w+"%"}
-   fc.set(key,{f:l.style.fontSize,w:sv&&w<100?sv.style.width:""});
-  });
- }
-}
-let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
-$("pre1").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("pw").value=$("lw").value;$("ph").value=$("lh").value;$("cpr").value=1;$("rpp").value=1;$("mg").value=0;$("gap").value=0;render()};
-$("pre2").onclick=()=>{$("mode").value="page";$("paper").value="custom";$("ph").value=$("lh").value;$("cpr").value=2;$("rpp").value=1;$("mg").value=0;$("gap").value=2;render()};
-["mode","cpr","rpp","rep","paper","pw","ph","lw","lh","gap","mg","fs","bh","guide","fit","bcType","bcText","customHtml","useCustom","cssBox","sep"].forEach(id=>$(id).addEventListener("input",rq));
-$("printBtn").onclick=()=>window.print();
-window.addEventListener("beforeprint",()=>render(true));window.addEventListener("afterprint",()=>render());
-buildTplList();buildCols();renderRecs();render();
-</script>
-</body>
-</html>
+:root{--bg:#f6f3ec;--ink:#14231c;--mute:#56645c;--brand:#0f6b4f;--card:#fff;--line:#ddd8cb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
+a{color:inherit}.w{max-width:1040px;margin:0 auto;padding:0 20px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0}
+.logo{font:700 20px Georgia,serif;text-decoration:none}
+.btn{display:inline-block;padding:12px 22px;border-radius:8px;background:var(--brand);color:#fff;text-decoration:none;font-weight:600;border:2px solid var(--brand)}
+.btn.o{background:transparent;color:var(--brand)}.btn:focus-visible{outline:3px solid #e08a00;outline-offset:2px}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding:48px 0 64px}
+h1{font:700 clamp(32px,5vw,52px)/1.1 Georgia,serif;margin:0 0 16px}h2{font:700 30px Georgia,serif;margin:0 0 24px}
+.lead{color:var(--mute);font-size:18px;margin:0 0 26px}.cta{display:flex;gap:12px;flex-wrap:wrap}
+.lbl{background:#fff;border:1px solid var(--line);box-shadow:6px 6px 0 var(--brand);padding:16px;font:13px/1.35 Arial,sans-serif;transform:rotate(-2deg)}
+.bc{height:54px;margin:10px 4px 4px;background:repeating-linear-gradient(90deg,#111 0 2px,#fff 2px 4px,#111 4px 5px,#fff 5px 8px,#111 8px 11px,#fff 11px 13px)}
+section{padding:48px 0;border-top:1px solid var(--line)}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px}.c h3{margin:0 0 6px;font-size:17px}.c p{margin:0;color:var(--mute);font-size:15px}
+.n{font:700 28px Georgia,serif;color:var(--brand)}
+.price{max-width:380px;border:2px solid var(--brand);border-radius:12px;padding:26px;background:#fff}
+.price b{font:700 36px Georgia,serif}.price ul{padding-left:20px;color:var(--mute)}
+details{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:10px}summary{cursor:pointer;font-weight:600}
+footer{padding:30px 0;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
+@media(max-width:760px){.hero{grid-template-columns:1fr}}
+</style></head><body><div class="w">
+<nav><a class="logo" href="/">Label Studio</a><span><a href="/barcode" style="margin-right:18px;text-decoration:none;font-weight:600">Real-time barcode</a><a class="btn o" href="/app">Open the tool</a></span></nav>
+<header class="hero"><div>
+<h1>From Excel sheet to print-ready labels in seconds.</h1>
+<p class="lead">Create MRP and barcode labels from any spreadsheet. Pick your columns, choose a template, and print on rolls or A4. Your data never leaves your browser.</p>
+<div class="cta"><a class="btn" href="/app">Start making labels</a><a class="btn o" href="#pricing">See pricing</a></div></div>
+<div class="lbl" aria-hidden="true"><b>Brand Name : Petjoy</b><br>Product : Adjustable Strap Harness (M, Black)<br><b>SKU ID : PJMS106</b><br>Asin : B0FY38F19S<br><b>MRP : 398</b><div class="bc"></div><div style="text-align:center;font-weight:700;font-family:monospace">X002JNFQHV</div></div></header>
+<section><h2>Everything you need for label printing</h2><div class="g">
+<div class="c"><h3>Works with any Excel</h3><p>Upload .xlsx or .csv. Every column becomes an attribute you can show, rename, bold or reorder.</p></div>
+<div class="c"><h3>MRP and barcode templates</h3><p>Several ready layouts, plus your own HTML and CSS for a fully custom look.</p></div>
+<div class="c"><h3>Barcode from any column</h3><p>Code 128, EAN-13, EAN-8, UPC and more, generated from the column you choose.</p></div>
+<div class="c"><h3>Multiple labels per paper</h3><p>Set label size, labels per row and paper size, from 2-up thermal rolls to A4 sheets.</p></div>
+<div class="c"><h3>Instant search and reprint</h3><p>Type a SKU, ASIN or barcode and just that label appears, with the copies you need.</p></div>
+<div class="c"><h3>Real-time barcode</h3><p>Pick any paper size, type or scan a value, and print a barcode instantly. <a href="/barcode">Try it</a>.</p></div>
+<div class="c"><h3>Private by design</h3><p>Files are processed in your browser. Nothing is uploaded to our servers.</p></div></div></section>
+<section><h2>How it works</h2><div class="g">
+<div class="c"><div class="n">1</div><h3>Upload</h3><p>Drop in your Excel or CSV file.</p></div>
+<div class="c"><div class="n">2</div><h3>Choose</h3><p>Select columns, template, barcode column and paper size.</p></div>
+<div class="c"><div class="n">3</div><h3>Print</h3><p>Print directly or save as PDF.</p></div></div></section>
+<section id="pricing"><h2>Pricing</h2><div class="price"><p style="margin:0;color:var(--mute)">Early access</p><b>Free</b><ul><li>All templates and features</li><li>Unlimited labels</li><li>Pro plan with updates and support coming soon</li></ul>
+<a class="btn" href="/app">Use it free</a></div></section>
+<section><h2>FAQ</h2>
+<details><summary>Is my data uploaded anywhere?</summary><p>No. Your Excel file is read and turned into labels inside your browser, and is gone when you close or refresh the page.</p></details>
+<details><summary>Which printers work?</summary><p>Any printer that can print from a browser, including thermal label printers. Set your paper size and print with margins set to None and scale 100%.</p></details>
+<details><summary>Can I print 2 labels side by side on a roll?</summary><p>Yes. Choose per-paper mode, set the paper width, label size and labels per row.</p></details></section>
+<footer>© Label Studio. All rights reserved.</footer></div></body></html>

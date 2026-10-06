@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-time Barcode – Label Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<style>
+:root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+.app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+h1{font-size:20px;margin:0 0 2px}.sub{color:var(--mute);margin:0 0 12px;font-size:13px}
+details{border:1px solid var(--line);border-radius:6px;margin-bottom:10px}
+summary{padding:9px 12px;font-weight:600;cursor:pointer;background:var(--brand2);border-radius:6px}
+.body{padding:10px 12px}label{display:block;margin:6px 0 2px;font-size:12.5px;color:var(--mute)}
+.chk{display:flex;align-items:center;gap:7px;color:var(--ink);cursor:pointer}
+input[type=text],input[type=number],select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:5px;font:inherit;background:#fff}
+#val{font-size:18px;padding:10px;border:2px solid var(--brand)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;padding:8px 12px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer;font-weight:600}
+button.alt{background:#fff;color:var(--brand)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #e08a00;outline-offset:1px}
+.rrow{display:flex;gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:4px 0}
+.rrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp{width:62px!important;padding:3px 4px!important}.rrow button{padding:2px 8px}
+.q{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin-top:8px}
+main{padding:18px;overflow:auto}.bar{display:flex;gap:10px;align-items:center;margin-bottom:12px}.bar .info{flex:1;color:var(--mute)}
+.paper{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto;width:fit-content}
+.cell{display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:1mm;flex:none;font-family:Arial,sans-serif;color:#000;outline:1px dashed #bbb}
+.t{font-weight:700;text-align:center;line-height:1.15;margin-bottom:.5mm}
+svg.bc{width:100%;flex:1;min-height:0}
+.pg{break-after:page;page-break-after:always;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;overflow:hidden}
+.pg:last-child{break-after:auto;page-break-after:auto}
+.err{font:12px Arial;color:#b00;padding:4px;text-align:center}
+.empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
+@media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
+@media print{body{background:#fff}.app{display:block}aside,.bar,.empty{display:none}main{padding:0}
+.paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}.cell{outline:none}.pg{box-shadow:none;margin:0}}
+</style><style id="pageStyle"></style></head><body>
+<div class="app"><aside>
+<a href="/" style="color:var(--brand);text-decoration:none;font-size:12.5px">← Home</a> · <a href="/app" style="color:var(--brand);font-size:12.5px">Excel labels</a>
+<h1>Real-time Barcode</h1><p class="sub">Pick a paper, type or scan, and print.</p>
+
+<details open><summary>1. Paper</summary><div class="body">
+<label>Paper size</label>
+<select id="paper"><option value="210,297">A4</option><option value="148,210">A5</option><option value="216,279">Letter</option><option value="101.6,152.4">4 × 6 in</option><option value="custom">Custom / roll</option></select>
+<div class="row" id="cust" hidden><div><label>Width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div><label>Height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
+<label>Layout</label>
+<select id="mode"><option value="flow">Sheet: many barcodes per paper</option><option value="page">One barcode per paper (roll / thermal)</option></select>
+<div class="row"><div><label>Barcode box width mm</label><input type="number" id="cw" value="50"></div><div><label>Barcode box height mm</label><input type="number" id="ch" value="30"></div></div>
+<div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="5"></div></div>
+<p class="sub" style="margin:6px 0 0">In "one per paper" mode the barcode fills the whole paper.</p>
+</div></details>
+
+<details open><summary>2. Type or scan</summary><div class="body">
+<label>Barcode value (scanner works here, Enter adds it)</label>
+<input type="text" id="val" autocomplete="off" autofocus placeholder="Type or scan…">
+<label>Title above barcode (optional)</label><input type="text" id="ttl" autocomplete="off">
+<div class="row"><div><label>Copies</label><input type="number" id="cpy" value="1" min="1"></div>
+<div><label>Barcode type</label><select id="fmt"><option value="AUTO">Auto</option><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option><option>ITF14</option></select></div></div>
+<label class="chk" style="margin:8px 0"><input type="checkbox" id="txt" checked> Show number below barcode</label>
+<label>Title font size (pt)</label><input type="number" id="fs" value="9" step="0.5">
+<div class="row" style="margin-top:8px"><button id="add">Add to queue</button><button class="alt" id="clr">Clear queue</button></div>
+<div class="q" id="list"></div>
+</div></details>
+</aside>
+<main><div class="bar"><div class="info" id="count"></div><button id="printBtn">Print / PDF</button></div>
+<div class="paper" id="paperEl"><div id="sheet"></div></div></main></div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let q=[];
+const fmtFor=v=>{const f=$("fmt").value;return f!=="AUTO"?f:/^\d{13}$/.test(v)?"EAN13":/^\d{12}$/.test(v)?"UPC":/^\d{8}$/.test(v)?"EAN8":"CODE128"};
+const draft=()=>{const v=$("val").value.trim();return v?{v,t:$("ttl").value.trim(),n:Math.max(1,+$("cpy").value||1)}:null};
+function commit(){const d=draft();if(!d)return;q.push(d);$("val").value="";renderList();render();$("val").focus()}
+function renderList(){$("list").innerHTML=q.map((x,i)=>`<div class="rrow"><span title="${esc(x.v)}">${esc(x.v)}${x.t?" · "+esc(x.t):""}</span><input class="cp" type="number" min="1" value="${x.n}" data-n="${i}" aria-label="Copies"><button class="alt" data-x="${i}" aria-label="Remove">✕</button></div>`).join("")||'<p class="sub" style="margin:8px 0">Queue is empty. Type or scan, then press Enter to add.</p>'}
+function gen(s,v){const auto=$("fmt").value==="AUTO";let f=fmtFor(v);
+ const o=()=>({format:f,displayValue:$("txt").checked,height:60,width:2,margin:6,fontSize:16,fontOptions:"bold"});
+ try{JsBarcode(s,v,o())}catch(e){if(auto&&f!=="CODE128"){f="CODE128";try{JsBarcode(s,v,o())}catch(e2){return{err:1,f}}}else return{err:1,f}}
+ return{h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
+function render(){
+ const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
+ $("cust").hidden=$("paper").value!=="custom";
+ const per=$("mode").value==="page",mg=+$("mg").value,gap=+$("gap").value,fs=+$("fs").value;
+ const W=per?PW-2*mg:+$("cw").value,H=per?PH-2*mg:+$("ch").value;
+ const items=[];q.forEach(x=>{for(let i=0;i<x.n;i++)items.push(x)});const d=draft();if(d)for(let i=0;i<d.n;i++)items.push(d);
+ $("pageStyle").textContent=per?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
+ const P=$("paperEl"),S=$("sheet");
+ $("count").textContent=items.length?`${items.length} barcode(s)`+(d?" · live preview of what you are typing":""):"Nothing to print yet";
+ if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly.</div>';return}
+ const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm">${x.t?`<div class="t" style="font-size:${fs}pt">${esc(x.t)}</div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg></div>`;
+ if(per){P.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";S.style.cssText="display:block";
+  S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH}mm;padding:${mg}mm">${cell(x)}</div>`).join("")}
+ else{P.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;S.style.cssText=`display:flex;flex-wrap:wrap;gap:${gap}mm;align-content:flex-start;width:${PW-2*mg}mm`;S.innerHTML=items.map(cell).join("")}
+ const cache=new Map();
+ document.querySelectorAll("svg.bc").forEach(s=>{const v=s.dataset.v;let c=cache.get(v);
+  if(!c){c=gen(s,v);cache.set(v,c)}else if(!c.err){c.a.forEach(([n,x])=>s.setAttribute(n,x));s.innerHTML=c.h}
+  if(c.err)s.outerHTML=`<div class="err">Cannot make a ${c.f} barcode from "${esc(v)}"</div>`});
+}
+$("val").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
+$("ttl").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
+$("add").onclick=commit;
+$("clr").onclick=()=>{q=[];renderList();render()};
+$("printBtn").onclick=()=>window.print();
+$("list").addEventListener("input",e=>{const i=e.target.dataset.n;if(i!==undefined){q[i].n=Math.max(1,+e.target.value||1);render()}});
+$("list").addEventListener("click",e=>{const i=e.target.dataset.x;if(i!==undefined){q.splice(+i,1);renderList();render()}});
+["paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","fs"].forEach(id=>$(id).addEventListener("input",render));
+renderList();render();
+</script></body></html>
