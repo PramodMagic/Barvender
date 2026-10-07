@@ -93,7 +93,7 @@ main{padding:18px;overflow:auto}
   <p class="sub" id="recInfo" style="margin:6px 0 0"></p>
  </div></details>
 
- <details open><summary>2. Columns: show, label, bold, lines, order</summary><div class="body">
+ <details open><summary>2. Columns: show, label, size %, bold, lines, order</summary><div class="body">
   <div class="row"><button class="alt" id="allOn">Select all</button><button class="alt" id="allOff">Clear all</button></div>
   <div class="cols" id="colList" style="margin-top:8px"></div>
   <label>Name column</label><select id="mName"></select>
@@ -130,7 +130,8 @@ main{padding:18px;overflow:auto}
   <div class="row"><div><label>Shift X mm (alignment)</label><input type="number" id="sx" value="0" step="0.1"></div><div><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div></div>
   <button class="alt" id="calBtn" style="margin:2px 0 8px;width:100%">Print calibration test label</button>
   <div class="row"><div><label>Font size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div><div><label>Barcode height mm</label><input type="number" id="bh" value="14"></div></div>
-  <label class="chk"><input type="checkbox" id="fit" checked> Auto-fit text inside the label (barcode stays visible)</label>
+  <label>Auto-fit text to the label</label>
+  <select id="fit"><option value="shrink">Shrink only if it does not fit</option><option value="grow">Fit label: shrink or enlarge</option><option value="off">Off (use my sizes exactly)</option></select>
   <label class="chk"><input type="checkbox" id="guide" checked> Show guide border in preview</label>
  </div></details>
 
@@ -169,7 +170,7 @@ const TEMPLATES={
   const lines=cols.filter(c=>sel.has(c)&&!skip.includes(c)&&String(d.row[c]??"").trim()!=="").map(c=>{
    const f=colCfg[c]||{label:c,bold:0,clamp:0};
    const cl=f.clamp?`display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;-webkit-line-clamp:${f.clamp};`:"";
-   return `<div style="${cl}font-weight:${f.bold?700:400}">${esc(f.label)}${f.label?esc(sep):""}${esc(d.row[c])}</div>`}).join("");
+   return `<div style="${cl}font-weight:${f.bold?700:400};font-size:${f.size||100}%">${esc(f.label)}${f.label?esc(sep):""}${esc(d.row[c])}</div>`}).join("");
   return `<div>${lines}</div>${d.bar?`<div class="bcw" style="margin-top:1mm">${bc(d.bar)}</div>`:""}`}},
  m1:{n:"MRP – Classic box",t:"MRP",css:"t-box",h:d=>`<div><div class="nm">${d.name}</div><div class="ex">${d.extra}</div></div>${d.mrp?`<div class="mrp">MRP Rs. ${d.mrp} <span class="ex" style="font-weight:400">(incl. all taxes)</span></div>`:""}${d.bar?bc(d.bar):""}`},
  m2:{n:"MRP – Big price",t:"MRP",css:"t-box ctr",h:d=>`<div class="nm">${d.name}</div>${d.mrp?`<div><span class="ex">MRP Rs.</span> <span class="big">${d.mrp}</span></div>`:""}<div class="ex">${d.extra}</div>`},
@@ -193,12 +194,13 @@ function buildTplList(){
 /* ---------- columns UI ---------- */
 function guess(re){return cols.find(c=>re.test(c))||""}
 let colCfg={};
-function initCfg(){colCfg={};cols.forEach(c=>colCfg[c]={label:c,bold:/^(brand|sku|mrp)/i.test(c),clamp:/product|title|desc/i.test(c)?2:/import|mktd|address/i.test(c)?3:/care|contact/i.test(c)?2:0})}
+function initCfg(){colCfg={};cols.forEach(c=>colCfg[c]={label:c,size:100,bold:/^(brand|sku|mrp)/i.test(c),clamp:/product|title|desc/i.test(c)?2:/import|mktd|address/i.test(c)?3:/care|contact/i.test(c)?2:0})}
 function renderColList(){
  $("colList").innerHTML=`<label class="chk" style="padding:3px 0"><input type="radio" name="bcsel" data-k="r0" ${$("mBar").value?"":"checked"}> No barcode</label>`+cols.map((c,i)=>{const f=colCfg[c];return `<div class="crow"><div style="display:flex;justify-content:space-between;gap:6px"><label class="chk"><input type="checkbox" data-k="s" data-i="${i}" ${sel.has(c)?"checked":""}> <b>${esc(c)}</b></label>
  <label class="chk" title="Make a barcode from this column" style="color:var(--brand);font-weight:600"><input type="radio" name="bcsel" data-k="r" data-i="${i}" ${$("mBar").value===c?"checked":""}>Barcode</label></div>
  <div class="cctl"><input type="text" data-k="l" data-i="${i}" value="${esc(f.label)}" title="Label text (empty = value only)">
  <label class="chk" title="Bold"><input type="checkbox" data-k="b" data-i="${i}" ${f.bold?"checked":""}>B</label>
+ <input type="number" data-k="z" data-i="${i}" value="${f.size||100}" min="30" max="300" step="10" title="Text size %" style="width:58px;padding:3px 4px">
  <select data-k="n" data-i="${i}" title="Max lines">${[0,1,2,3,4].map(n=>`<option value="${n}" ${f.clamp==n?"selected":""}>${n?n+" line":"All"}</option>`).join("")}</select>
  <button class="alt" data-k="u" data-i="${i}" title="Move up">↑</button><button class="alt" data-k="d" data-i="${i}" title="Move down">↓</button></div></div>`}).join("");
 }
@@ -209,6 +211,7 @@ $("colList").addEventListener("input",e=>{
  if(k==="s")t.checked?sel.add(c):sel.delete(c);
  if(k==="l")colCfg[c].label=t.value;
  if(k==="b")colCfg[c].bold=t.checked;
+ if(k==="z")colCfg[c].size=Math.max(30,+t.value||100);
  if(k==="n")colCfg[c].clamp=+t.value;
  rq();
 });
@@ -351,13 +354,14 @@ function render(full){
   }else if(!c.err){c.a.forEach(([n,x])=>s.setAttribute(n,x));s.innerHTML=c.h}
   if(c.err)s.outerHTML=`<span class="ex" style="color:#b00">Invalid ${type}: ${esc(v)}</span>`;
  });
- if($("fit").checked){
+ const FM=$("fit").value;if(FM!=="off"){
   const fc=new Map();
   document.querySelectorAll(".lbl").forEach(l=>{
    const key=l.innerHTML+l.className+l.style.cssText,sv=l.querySelector("svg.bcode"),hit=fc.get(key);
    if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;return}
    let f=parseFloat(l.style.fontSize),n=0;
-   while(l.scrollHeight>l.clientHeight+1&&f>3.5&&n++<8){f=Math.max(3.5,f*Math.max(.7,l.clientHeight/l.scrollHeight*.97));l.style.fontSize=f+"pt"}
+   if(FM==="grow"&&l.scrollHeight<=l.clientHeight+1){let g=0;while(f<24&&g++<48){l.style.fontSize=(f+.5)+"pt";if(l.scrollHeight>l.clientHeight+1){l.style.fontSize=f+"pt";break}f+=.5}}
+   else while(l.scrollHeight>l.clientHeight+1&&f>3.5&&n++<8){f=Math.max(3.5,f*Math.max(.7,l.clientHeight/l.scrollHeight*.97));l.style.fontSize=f+"pt"}
    let w=100;
    while(sv&&l.scrollHeight>l.clientHeight+1&&w>35){w-=10;sv.style.width=w+"%"}
    fc.set(key,{f:l.style.fontSize,w:sv&&w<100?sv.style.width:""});
