@@ -148,7 +148,7 @@ function drawPage(pg,S){
    if(el.classList.contains("bcode")||el.classList.contains("bc")){
     const vb=(el.getAttribute("viewBox")||"").trim().split(/[\s,]+/).map(Number),sr=el.getBoundingClientRect();
     if(vb.length===4&&vb[2]>0&&vb[3]>0){const sx=sr.width/vb[2],sy=sr.height/vb[3];x.fillStyle="#000";
-     el.querySelectorAll("rect").forEach(q=>{const ws=q.getAttribute("width")||"",w=parseFloat(ws),h=parseFloat(q.getAttribute("height"));
+     el.querySelectorAll("rect").forEach(q=>{if(q.parentNode===el)return;const ws=q.getAttribute("width")||"",w=parseFloat(ws),h=parseFloat(q.getAttribute("height"));
       if(!(w>0&&h>0)||ws.includes("%"))return;
       const g=q.parentNode,m=/translate\(\s*([-\d.]+)[\s,]+([-\d.]+)\s*\)/.exec((g.getAttribute&&g.getAttribute("transform"))||""),tx=m?+m[1]:0,ty=m?+m[2]:0;
       const l=sr.left+(tx+(+q.getAttribute("x")||0)-vb[0])*sx,t=sr.top+(ty+(+q.getAttribute("y")||0)-vb[1])*sy;
