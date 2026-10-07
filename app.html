@@ -401,7 +401,16 @@ function drawPage(pg,S){
  };
  const walk=(el,ul)=>{
   const cs=getComputedStyle(el);if(cs.display==="none"||cs.visibility==="hidden")return;
-  if(el.tagName.toLowerCase()==="svg"){if(el.classList.contains("bcode")||el.classList.contains("bc")){x.fillStyle="#000";el.querySelectorAll("rect").forEach(q=>{if(q.getAttribute("width")!=="100%")bar(q.getBoundingClientRect())})}return}
+  if(el.tagName.toLowerCase()==="svg"){
+   if(el.classList.contains("bcode")||el.classList.contains("bc")){
+    const vb=(el.getAttribute("viewBox")||"").trim().split(/[\s,]+/).map(Number),sr=el.getBoundingClientRect();
+    if(vb.length===4&&vb[2]>0&&vb[3]>0){const sx=sr.width/vb[2],sy=sr.height/vb[3];x.fillStyle="#000";
+     el.querySelectorAll("rect").forEach(q=>{const ws=q.getAttribute("width")||"",w=parseFloat(ws),h=parseFloat(q.getAttribute("height"));
+      if(!(w>0&&h>0)||ws.includes("%"))return;
+      const g=q.parentNode,m=/translate\(\s*([-\d.]+)[\s,]+([-\d.]+)\s*\)/.exec((g.getAttribute&&g.getAttribute("transform"))||""),tx=m?+m[1]:0,ty=m?+m[2]:0;
+      const l=sr.left+(tx+(+q.getAttribute("x")||0)-vb[0])*sx,t=sr.top+(ty+(+q.getAttribute("y")||0)-vb[1])*sy;
+      bar({left:l,right:l+w*sx,top:t,bottom:t+h*sy})})}
+   }return}
   const r=el.getBoundingClientRect(),inl=cs.display==="inline";x.save();
   if(!inl&&(cs.overflowX!=="visible"||cs.overflowY!=="visible"||(cs.webkitLineClamp&&cs.webkitLineClamp!=="none"))){x.beginPath();x.rect(r.left-ox,r.top-oy,r.width,r.height);x.clip()}
   if(!inl){
