@@ -79,7 +79,7 @@ svg.bc{width:100%;flex:1;min-height:0}
 <p class="sub" style="margin:10px 0 0">Press <b>Enter</b> (or scan) to print right away.</p>
 </div></details>
 </aside>
-<main><div class="bar"><div class="info" id="count"></div><button id="printBtn">Print</button> <button class="alt" id="pdfBtn">Download PDF (exact size)</button></div>
+<main><div class="bar"><div class="info" id="count"></div><button id="printBtn">Print</button> <button class="alt" id="pdfBtn">Download PDF (exact size)</button> <span id="pfb" style="font-size:12.5px"></span></div>
 <div class="paper" id="paperEl"><div id="sheet"></div></div></main></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -140,11 +140,21 @@ async function toPDF(){const b=$("pdfBtn"),t=b.textContent;b.disabled=true;
  try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
   list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
  render();b.disabled=false;b.textContent=t}
-async function printNow(){const b=$("printBtn"),t=b.textContent;b.disabled=true;
- try{const{PW,list}=await snap(b,"Preparing");$("pimgs").innerHTML=list.map(r=>`<img src="${r.url}" style="width:${PW}mm;height:${r.h}mm">`).join("");
-  await Promise.all([...$("pimgs").querySelectorAll("img")].map(i=>i.decode().catch(()=>0)));
-  document.body.classList.add("pimode");window.print()}catch(e){alert("Print error: "+e.message)}
- render();b.disabled=false;b.textContent=t}
+async function printNow(){
+ const b=$("printBtn"),t=b.textContent;b.disabled=true;
+ try{
+  const{PW,PH,list}=await snap(b,"Preparing");calib=false;
+  const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});
+  const url=URL.createObjectURL(doc.output("blob"));
+  const old=document.getElementById("pfrm");if(old)old.remove();
+  const f=document.createElement("iframe");f.id="pfrm";f.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
+  f.onload=()=>setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){window.open(url,"_blank")}},400);
+  f.src=url;document.body.appendChild(f);
+  $("pfb").innerHTML=`<a href="${url}" target="_blank" style="color:var(--brand)">Print window not opening? Open the PDF</a>`;
+ }catch(e){alert("Print error: "+e.message)}
+ render();b.disabled=false;b.textContent=t;
+ const v=document.getElementById("val");if(v){v.focus();v.select()}}
 window.addEventListener("afterprint",()=>{document.body.classList.remove("pimode");$("pimgs").innerHTML="";if(calib){calib=false;render()}});
 $("calBtn").onclick=()=>{calib=true;printNow()};
 $("pdfBtn").onclick=toPDF;$("printBtn").onclick=printNow;
