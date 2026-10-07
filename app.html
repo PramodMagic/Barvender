@@ -6,6 +6,8 @@
 <title>Label Studio – MRP & Barcode</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
 *{box-sizing:border-box}
@@ -44,6 +46,7 @@ main{padding:18px;overflow:auto}
 .empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
 .pg{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;overflow:hidden;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;break-after:page;page-break-after:always}
 .pg:last-child{break-after:auto;page-break-after:auto}
+.bcw{width:100%}.pdfmode .lbl,.pdfmode .cell{outline:none!important}.pdfmode .pg{box-shadow:none!important;margin:0!important}
 .lbl{overflow:hidden;position:relative;break-inside:avoid;page-break-inside:avoid;font-family:Arial,sans-serif;color:#000}
 .lbl svg{max-width:100%}
 .lbl.guide{outline:1px dashed #bbb}
@@ -73,7 +76,7 @@ main{padding:18px;overflow:auto}
 <style id="userCss"></style>
 </head>
 <body>
-<nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l on" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a></nav>
+<nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l on" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a><a class="l" href="/returns">Returns</a></nav>
 <div class="app">
 <aside>
  <h1>Label Studio</h1>
@@ -126,12 +129,12 @@ main{padding:18px;overflow:auto}
   <div class="row" id="customPaper"><div><label>Paper width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div><label>Paper height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
   <div class="row"><div><label>Label width mm</label><input type="number" id="lw" value="50"></div><div><label>Label height mm</label><input type="number" id="lh" value="38"></div></div>
   <div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="0"></div></div>
-  <div class="row"><div><label>Inner padding mm</label><input type="number" id="ip" step="0.5" placeholder="auto"></div><div></div></div>
+  <div class="row"><div><label>Inner padding mm</label><input type="number" id="ip" step="0.5" value="1.5"></div><div></div></div>
   <div class="row"><div><label>Shift X mm (alignment)</label><input type="number" id="sx" value="0" step="0.1"></div><div><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div></div>
   <button class="alt" id="calBtn" style="margin:2px 0 8px;width:100%">Print calibration test label</button>
   <div class="row"><div><label>Font size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div><div><label>Barcode height mm</label><input type="number" id="bh" value="14"></div></div>
   <label>Auto-fit text to the label</label>
-  <select id="fit"><option value="shrink">Shrink only if it does not fit</option><option value="grow">Fit label: shrink or enlarge</option><option value="off">Off (use my sizes exactly)</option></select>
+  <select id="fit"><option value="shrink">Shrink only if it does not fit</option><option value="grow" selected>Fit label: shrink or enlarge</option><option value="off">Off (use my sizes exactly)</option></select>
   <label class="chk"><input type="checkbox" id="guide" checked> Show guide border in preview</label>
  </div></details>
 
@@ -149,7 +152,7 @@ main{padding:18px;overflow:auto}
 <main>
  <div class="bar">
   <div class="info" id="count"></div>
-  <button id="printBtn">Print / PDF</button>
+  <button id="printBtn">Print</button> <button class="alt" id="pdfBtn">Download PDF (exact size)</button>
  </div>
  <div class="paper" id="paperEl"><div class="sheet" id="sheet"></div></div>
 </main>
@@ -306,16 +309,16 @@ function render(full){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
  $("customPaper").hidden=$("paper").value!=="custom";$("pageOpts").hidden=!m2;
  const lw=+$("lw").value,lh=+$("lh").value,gap=+$("gap").value,fs=+$("fs").value;
- const AU=m2&&$("auto").checked,mg=AU?0:+$("mg").value;
+ const AU=m2&&$("auto").checked,mg=AU?0:+$("mg").value,aw=PW-2*mg,ah=PH-2*mg;
  const fit=(P,l,g)=>{let c=Math.max(1,Math.floor((P+.5)/l));while(c>1&&c*l+(c-1)*g>P+.5)c--;return c};
- const cN=AU?fit(PW,lw,gap):Math.max(1,+$("cpr").value||1),rN=AU?fit(PH,lh,gap):Math.max(1,+$("rpp").value||1);
- const gx=AU&&cN>1?Math.max(0,Math.min(gap,(PW-cN*lw)/(cN-1))):gap,gy=AU&&rN>1?Math.max(0,Math.min(gap,(PH-rN*lh)/(rN-1))):gap;
- const per=cN*rN;$("cpr").disabled=$("rpp").disabled=$("mg").disabled=AU;
- $("pageStyle").textContent=m2?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
+ const manual=m2&&!AU;
+ const cN=manual?Math.max(1,+$("cpr").value||1):fit(aw,lw,gap),rN=manual?Math.max(1,+$("rpp").value||1):fit(ah,lh,gap);
+ const gx=!manual&&cN>1?Math.max(0,Math.min(gap,(aw-cN*lw)/(cN-1))):gap,gy=!manual&&rN>1?Math.max(0,Math.min(gap,(ah-rN*lh)/(rN-1))):gap;
+ const per=cN*rN;$("cpr").disabled=$("rpp").disabled=!manual;$("mg").disabled=AU;
+ $("pageStyle").textContent=`@page{size:${PW}mm ${PH}mm;margin:0}`;
  $("userCss").textContent=$("cssBox").value;
  const paper=$("paperEl");
- if(m2){paper.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";$("sheet").style.cssText="display:block"}
- else{paper.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;$("sheet").style.cssText=`gap:${gap}mm;width:${PW-2*mg}mm`}
+ paper.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";$("sheet").style.cssText="display:block";
  const keys=$("useCustom").checked?["__c"]:[...tplSel].filter(k=>TEMPLATES[k]);
  let items=[],total=0,limited=false;const MAX=full===true?1e9:40;
  const use=$("q").value.trim()?new Set(hits):pick.size?new Set(pick.keys()):null;
@@ -334,15 +337,12 @@ function render(full){
   }
  }
  const n=total;let pages=1,html;
- if(calib&&m2)items=Array(+$("cpr").value*+$("rpp").value||1).fill(CAL(lw,lh,sh));
- if(!m2)html=items.join("");
- else{
-  html="";pages=0;
-  for(let i=0;i<items.length;i+=per){pages++;
-   html+=`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm;gap:${gy}mm ${gx}mm${AU?";align-content:center":""}">${items.slice(i,i+per).join("")}</div>`}
- }
+ if(calib)items=Array(per).fill(CAL(lw,lh,sh));
+ html="";pages=0;
+ for(let i=0;i<items.length;i+=per){pages++;
+  html+=`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm;gap:${gy}mm ${gx}mm;align-content:${AU?"center":"flex-start"}">${items.slice(i,i+per).join("")}</div>`}
  $("sheet").innerHTML=html;
- $("count").textContent=`${n} labels · ${use?use.size:rows.length} records · ${keys.length} template(s)`+(m2?` · ${Math.ceil(total/per)} paper(s), ${per} label/paper${AU?` (auto: ${cN} across × ${rN} down)`:""}`:"");
+ $("count").textContent=`${n} labels · ${use?use.size:rows.length} records · ${keys.length} template(s)`+(true?` · ${Math.ceil(total/per)} paper(s), ${per} label/paper${AU?` (auto: ${cN} across × ${rN} down)`:""}`:"");
  if(limited)$("count").textContent+=` · preview shows first ${MAX} labels, Print includes all`;
  const type=$("bcType").value,bcache=new Map(),opts={format:type,displayValue:$("bcText").checked,height:+$("bh").value*3.78,width:1.4,margin:0,fontSize:12,fontOptions:"bold"};
  document.querySelectorAll(".bcode").forEach(s=>{
@@ -355,19 +355,36 @@ function render(full){
   if(c.err)s.outerHTML=`<span class="ex" style="color:#b00">Invalid ${type}: ${esc(v)}</span>`;
  });
  const FM=$("fit").value;if(FM!=="off"){
-  const fc=new Map();
+  const fc=new Map(),ov=l=>l.scrollHeight>l.clientHeight+1||l.scrollWidth>l.clientWidth+1;
   document.querySelectorAll(".lbl").forEach(l=>{
    const key=l.innerHTML+l.className+l.style.cssText,sv=l.querySelector("svg.bcode"),hit=fc.get(key);
    if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;return}
    let f=parseFloat(l.style.fontSize),n=0;
-   if(FM==="grow"&&l.scrollHeight<=l.clientHeight+1){let g=0;while(f<24&&g++<48){l.style.fontSize=(f+.5)+"pt";if(l.scrollHeight>l.clientHeight+1){l.style.fontSize=f+"pt";break}f+=.5}}
-   else while(l.scrollHeight>l.clientHeight+1&&f>3.5&&n++<8){f=Math.max(3.5,f*Math.max(.7,l.clientHeight/l.scrollHeight*.97));l.style.fontSize=f+"pt"}
+   if(FM==="grow"&&!ov(l)){let g=0;while(f<24&&g++<48){l.style.fontSize=(f+.5)+"pt";if(ov(l)){l.style.fontSize=f+"pt";break}f+=.5}}
+   else while(ov(l)&&f>3.5&&n++<30){f=Math.max(3.5,f*Math.max(.8,Math.min(l.clientHeight/l.scrollHeight,l.clientWidth/l.scrollWidth)*.97));l.style.fontSize=f+"pt"}
    let w=100;
-   while(sv&&l.scrollHeight>l.clientHeight+1&&w>35){w-=10;sv.style.width=w+"%"}
+   while(sv&&ov(l)&&w>35){w-=10;sv.style.width=w+"%"}
    fc.set(key,{f:l.style.fontSize,w:sv&&w<100?sv.style.width:""});
   });
  }
 }
+async function toPDF(){
+ const b=$("pdfBtn");b.disabled=true;b.textContent="Making PDF…";
+ const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
+ try{
+  render(true);await new Promise(r=>setTimeout(r,80));
+  const pages=[...document.querySelectorAll("#sheet .pg")];if(!pages.length)throw new Error("Nothing to export yet");
+  document.body.classList.add("pdfmode");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
+  for(let i=0;i<pages.length;i++){
+   const c=await html2canvas(pages[i],{scale:4,backgroundColor:"#fff",logging:false});
+   if(i)doc.addPage([PW,PH],o);
+   doc.addImage(c.toDataURL("image/png"),"PNG",0,0,PW,PW*c.height/c.width);
+  }
+  doc.save("labels.pdf");
+ }catch(e){alert("PDF error: "+e.message)}
+ document.body.classList.remove("pdfmode");render();b.disabled=false;b.textContent="Download PDF (exact size)";
+}
+$("pdfBtn").onclick=toPDF;
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});

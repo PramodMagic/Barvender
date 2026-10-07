@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Returns Scanner – Label Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#eef1ee;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+.top{display:flex;align-items:center;gap:4px;padding:0 16px;height:48px;background:#fff;border-bottom:1px solid var(--line)}
+.top .logo{font:700 18px Georgia,serif;margin-right:auto;text-decoration:none;color:var(--ink)}
+.top a.l{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--ink);font-weight:600}.top a.on{background:var(--brand2);color:var(--brand)}
+.w{max-width:1000px;margin:0 auto;padding:16px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}.tabs button{background:#fff;color:var(--brand)}.tabs button.on{background:var(--brand);color:#fff}
+.box{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:12px}
+label{display:block;margin:8px 0 2px;font-size:12.5px;color:var(--mute)}
+input,select{padding:8px;border:1px solid var(--line);border-radius:5px;font:inherit;background:#fff;max-width:100%}
+input[type=text],input[type=email],input[type=password]{width:100%}
+#sv{font-size:20px;padding:12px;border:2px solid var(--brand);width:100%}
+button{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer;font-weight:600}
+button.alt{background:#fff;color:var(--brand)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #e08a00;outline-offset:1px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;background:#fcfdfc}
+.kv{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:8px}.kv span{color:var(--mute)}.kv b{color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.row>div{flex:1;min-width:140px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;background:#fff3cd;color:#7a5b00;font-size:12px}
+.msg{padding:8px 12px;border-radius:6px;margin-top:10px}.msg.ok{background:#d9f2e6;color:#0b5a3b}.msg.er{background:#fde2e2;color:#9b1c1c}
+table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}th,td{border:1px solid var(--line);padding:5px 8px;text-align:left}th{background:var(--brand2)}
+.sc{overflow:auto;max-height:420px}.cols{display:flex;flex-wrap:wrap;gap:4px 14px}.cols label{display:flex;gap:5px;align-items:center;margin:0;color:var(--ink)}
+[hidden]{display:none!important}
+</style></head><body>
+<nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a><a class="l on" href="/returns">Returns</a></nav>
+<div class="w">
+<div class="box" id="setup" hidden><b>Setup needed.</b> Open <code>returns.html</code>, put your Supabase URL and anon key at the top of the script, and run <code>schema.sql</code> in Supabase.</div>
+<div class="box" id="login" hidden style="max-width:380px;margin:40px auto"><h2 style="margin:0 0 6px">Sign in</h2>
+<label>Email</label><input type="email" id="le"><label>Password</label><input type="password" id="lp">
+<p><button id="lb">Sign in</button></p><div class="msg er" id="lerr" hidden></div></div>
+
+<div id="app" hidden>
+<div class="tabs"><button data-t="scan" class="on">Scan return</button><button data-t="master">Master data</button><button data-t="rep">Reports</button><button class="alt" id="out" style="margin-left:auto">Sign out</button></div>
+
+<section id="p-scan"><div class="box"><label>Scan or type any attribute (Return AWB, SKU, order id...)</label>
+<input type="text" id="sv" autocomplete="off" placeholder="Scan here and press Enter"><div id="smsg"></div><div id="cards"></div>
+<div id="sform" hidden><div class="row" style="margin-top:12px"><div><label>Note (optional)</label><input type="text" id="note"></div><div><label>Photo of product (optional)</label><input type="file" id="ph" accept="image/*" capture="environment"></div></div>
+<p><button id="save">Save</button> <button class="alt" id="clr">Cancel</button></p></div></div>
+<div class="box"><b>Saved in this session</b><div class="sc"><table id="recent"><thead><tr><th>Time</th><th>AWB</th><th>SKU</th><th>Return</th><th>Received</th><th>Remark</th></tr></thead><tbody></tbody></table></div></div></section>
+
+<section id="p-master" hidden><div class="box"><b>Upload master data</b> <span id="mcount" style="color:var(--mute)"></span>
+<label>Excel / CSV file (columns can be anything)</label><input type="file" id="mf" accept=".xlsx,.xls,.csv">
+<div id="map" hidden><div class="row"><div><label>Return AWB column</label><select id="mAwb"></select></div><div><label>SKU column</label><select id="mSku"></select></div><div><label>Return qty column</label><select id="mQty"></select></div></div>
+<label>Columns to show while scanning</label><div class="cols" id="mshow"></div>
+<label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" id="mRep"> Replace all existing master data</label>
+<p><button id="mup">Upload to database</button></p></div><div id="mmsg"></div></div></section>
+
+<section id="p-rep" hidden><div class="box"><div class="row"><div><label>From</label><input type="date" id="rf"></div><div><label>To</label><input type="date" id="rt"></div>
+<div><label>Group by</label><select id="rg"><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option></select></div>
+<div><button id="rl">Show report</button> <button class="alt" id="rd">Download Excel</button></div></div><div id="rmsg"></div></div>
+<div class="box" id="rbox" hidden><b>Summary</b><div class="sc"><table id="rs"></table></div><p><b>Details</b> <span id="rn" style="color:var(--mute)"></span></p><div class="sc"><table id="rdt"></table></div></div></section>
+</div></div>
+<script>
+const SUPABASE_URL="PASTE_YOUR_SUPABASE_URL",SUPABASE_ANON_KEY="PASTE_YOUR_ANON_KEY";
+const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const REM=["Fresh","Damage","Partial Damage","Partial Fresh"];
+const cfgOf=()=>JSON.parse(localStorage.getItem("ret_cfg")||"{}");
+const msg=(id,t,ok)=>{$(id).innerHTML=t?`<div class="msg ${ok?"ok":"er"}">${esc(t)}</div>`:""};
+if(SUPABASE_URL.startsWith("PASTE")){$("setup").hidden=false}else{
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+sb.auth.getSession().then(({data})=>show(!!data.session));
+function show(on){$("login").hidden=on;$("app").hidden=!on;if(on){countMaster();$("sv").focus()}}
+$("lb").onclick=async()=>{const{error}=await sb.auth.signInWithPassword({email:$("le").value.trim(),password:$("lp").value});$("lerr").hidden=!error;if(error)$("lerr").textContent=error.message;else show(true)};
+$("out").onclick=async()=>{await sb.auth.signOut();show(false)};
+document.querySelectorAll(".tabs [data-t]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs [data-t]").forEach(x=>x.classList.toggle("on",x===b));["scan","master","rep"].forEach(t=>$("p-"+t).hidden=t!==b.dataset.t);if(b.dataset.t==="scan")$("sv").focus()});
+
+/* ---- master ---- */
+async function countMaster(){const{count}=await sb.from("master_items").select("*",{count:"exact",head:true});$("mcount").textContent=count==null?"":`· ${count} rows in database`}
+let mrows=[],mcols=[],mfile=null;
+const guess=re=>mcols.find(c=>re.test(c))||"";
+$("mf").onchange=e=>{mfile=e.target.files[0];if(!mfile)return;const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:"array"});mrows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:false});mcols=Object.keys(mrows[0]||{});
+ const o='<option value="">— none —</option>'+mcols.map(c=>`<option>${esc(c)}</option>`).join("");const c0=cfgOf();
+ [["mAwb",/awb|tracking|waybill/i,"awb"],["mSku",/sku/i,"sku"],["mQty",/qty|quantity/i,"qty"]].forEach(([id,re,k])=>{$(id).innerHTML=o;$(id).value=mcols.includes(c0[k])?c0[k]:guess(re)});
+ $("mshow").innerHTML=mcols.map(c=>`<label><input type="checkbox" class="msh" value="${esc(c)}" ${!c0.show||c0.show.includes(c)?"checked":""}>${esc(c)}</label>`).join("");$("map").hidden=!mcols.length;msg("mmsg",mcols.length?`${mrows.length} rows found.`:"File is empty.",!!mcols.length)};r.readAsArrayBuffer(mfile)};
+$("mup").onclick=async()=>{
+ const cfg={awb:$("mAwb").value,sku:$("mSku").value,qty:$("mQty").value,show:[...document.querySelectorAll(".msh:checked")].map(x=>x.value)};
+ if(!cfg.awb&&!cfg.sku)return msg("mmsg","Choose at least the AWB or SKU column.");
+ localStorage.setItem("ret_cfg",JSON.stringify(cfg));$("mup").disabled=true;
+ try{
+  if($("mRep").checked){const{error}=await sb.from("master_items").delete().neq("id",0);if(error)throw error}
+  const st=await sb.storage.from("master-files").upload(Date.now()+"_"+mfile.name.replace(/[^\w.-]/g,"_"),mfile);
+  const data=mrows.map(r=>({awb:String(r[cfg.awb]??"").trim(),sku:String(r[cfg.sku]??"").trim(),ret_qty:parseFloat(r[cfg.qty])||0,data:r,vals:[...new Set(Object.values(r).map(v=>String(v).trim().toLowerCase()).filter(Boolean))]}));
+  for(let i=0;i<data.length;i+=500){msg("mmsg",`Uploading ${Math.min(i+500,data.length)} / ${data.length}…`,true);const{error}=await sb.from("master_items").insert(data.slice(i,i+500));if(error)throw error}
+  msg("mmsg",`Done. ${data.length} rows uploaded.`+(st.error?" (Original file could not be stored: "+st.error.message+")":" Original file saved in storage."),true);countMaster();
+ }catch(e){msg("mmsg",e.message)}$("mup").disabled=false};
+
+/* ---- scan ---- */
+let cur=[];
+$("sv").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();scan()}};
+async function scan(){
+ const v=$("sv").value.trim();if(!v)return;msg("smsg","");$("cards").innerHTML="";$("sform").hidden=true;
+ const{data,error}=await sb.from("master_items").select("*").contains("vals",[v.toLowerCase()]).limit(50);
+ if(error)return msg("smsg",error.message);
+ if(!data.length){msg("smsg",`"${v}" not found in master data.`);$("sv").select();return}
+ cur=data;const awbs=[...new Set(data.map(d=>d.awb).filter(Boolean))],done={};
+ if(awbs.length){const r=await sb.from("returns").select("awb,sku,received_qty").in("awb",awbs);(r.data||[]).forEach(x=>{const k=x.awb+"|"+x.sku;done[k]=(done[k]||0)+Number(x.received_qty)})}
+ const show=cfgOf().show||[];
+ $("cards").innerHTML=data.map((d,i)=>{const k=d.awb+"|"+d.sku;
+  return `<div class="card"><div class="kv"><span>AWB <b>${esc(d.awb)}</b></span><span>SKU <b>${esc(d.sku)}</b></span><span>Return qty <b>${esc(d.ret_qty)}</b></span>${show.filter(c=>d.data[c]!==undefined&&d.data[c]!=="").map(c=>`<span>${esc(c)} <b>${esc(d.data[c])}</b></span>`).join("")}${done[k]!==undefined?`<span class="badge">Already received: ${done[k]}</span>`:""}</div>
+  <div class="row"><div><label>Received qty</label><input type="number" class="rq" min="0" step="any"></div><div><label>Product remark</label><select class="rm"><option value="">Select…</option>${REM.map(r=>`<option>${r}</option>`).join("")}</select></div></div></div>`}).join("");
+ $("sform").hidden=false;const q=document.querySelector(".rq");q&&q.focus()}
+$("clr").onclick=()=>{$("cards").innerHTML="";$("sform").hidden=true;msg("smsg","");$("sv").value="";$("sv").focus()};
+$("save").onclick=async()=>{
+ const cs=[...document.querySelectorAll(".card")],rows=[];
+ for(let i=0;i<cs.length;i++){const q=cs[i].querySelector(".rq").value,rm=cs[i].querySelector(".rm").value;if(q===""&&!rm)continue;
+  if(q===""||!rm)return msg("smsg",`Row ${i+1}: enter both received qty and remark.`);rows.push({awb:cur[i].awb,sku:cur[i].sku,return_qty:cur[i].ret_qty,received_qty:+q,remark:rm,note:$("note").value.trim()||null})}
+ if(!rows.length)return msg("smsg","Enter received qty and remark first.");
+ $("save").disabled=true;
+ try{const f=$("ph").files[0];if(f){const p=Date.now()+"_"+f.name.replace(/[^\w.-]/g,"_");const u=await sb.storage.from("return-photos").upload(p,f);if(u.error)throw u.error;rows.forEach(r=>r.photo_path=p)}
+  const{error}=await sb.from("returns").insert(rows);if(error)throw error;
+  rows.forEach(r=>$("recent").tBodies[0].insertAdjacentHTML("afterbegin",`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(r.awb)}</td><td>${esc(r.sku)}</td><td>${esc(r.return_qty)}</td><td>${esc(r.received_qty)}</td><td>${esc(r.remark)}</td></tr>`));
+  $("cards").innerHTML="";$("sform").hidden=true;$("note").value="";$("ph").value="";$("sv").value="";msg("smsg",`Saved ${rows.length} row(s).`,true);$("sv").focus();
+ }catch(e){msg("smsg",e.message)}$("save").disabled=false};
+
+/* ---- reports ---- */
+const d2=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const now=new Date();$("rf").value=d2(new Date(now.getFullYear(),now.getMonth(),1));$("rt").value=d2(now);
+const gkey=(iso,g)=>{const d=new Date(iso);if(g==="month")return d2(d).slice(0,7);if(g==="week"){const x=new Date(d);x.setDate(d.getDate()-((d.getDay()+6)%7));return "Week of "+d2(x)}return d2(d)};
+let rrows=[],rsum=[];
+$("rl").onclick=async()=>{
+ msg("rmsg","Loading…",true);rrows=[];
+ try{const a=new Date($("rf").value+"T00:00:00").toISOString(),b=new Date($("rt").value+"T23:59:59.999").toISOString();
+  for(let s=0;;s+=1000){const{data,error}=await sb.from("returns").select("*").gte("created_at",a).lte("created_at",b).order("created_at",{ascending:false}).range(s,s+999);if(error)throw error;rrows.push(...data);if(data.length<1000)break}
+ }catch(e){return msg("rmsg",e.message)}
+ const g=$("rg").value,m={};
+ rrows.forEach(r=>{const k=gkey(r.created_at,g);m[k]=m[k]||{Period:k,Lines:0,"Return Qty":0,"Received Qty":0,Fresh:0,Damage:0,"Partial Damage":0,"Partial Fresh":0};const o=m[k];o.Lines++;o["Return Qty"]+=Number(r.return_qty)||0;o["Received Qty"]+=Number(r.received_qty)||0;o[r.remark]+=Number(r.received_qty)||0});
+ rsum=Object.values(m).sort((x,y)=>y.Period.localeCompare(x.Period));
+ const H=a=>"<thead><tr>"+Object.keys(a[0]).map(k=>`<th>${esc(k)}</th>`).join("")+"</tr></thead>";
+ const det=rrows.map(r=>({Time:new Date(r.created_at).toLocaleString(),AWB:r.awb,SKU:r.sku,"Return Qty":r.return_qty,"Received Qty":r.received_qty,Remark:r.remark,Note:r.note||"",Photo:r.photo_path||""}));rrows.det=det;
+ $("rs").innerHTML=rsum.length?H(rsum)+"<tbody>"+rsum.map(o=>"<tr>"+Object.values(o).map(v=>`<td>${esc(v)}</td>`).join("")+"</tr>").join("")+"</tbody>":"<tr><td>No data in this range.</td></tr>";
+ $("rdt").innerHTML=det.length?H(det)+"<tbody>"+det.slice(0,300).map(o=>"<tr>"+Object.values(o).map(v=>`<td>${esc(v)}</td>`).join("")+"</tr>").join("")+"</tbody>":"";
+ $("rn").textContent=`(${det.length} rows${det.length>300?", first 300 shown, the download has all":""})`;$("rbox").hidden=false;msg("rmsg","");
+};
+$("rd").onclick=()=>{if(!rrows.det||!rrows.det.length)return msg("rmsg","Click Show report first.");const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rsum),"Summary");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rrows.det),"Details");XLSX.writeFile(wb,`returns-${$("rf").value}-to-${$("rt").value}.xlsx`)};
+}
+</script></body></html>
