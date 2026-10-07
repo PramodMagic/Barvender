@@ -6,7 +6,6 @@
 <title>Label Studio – MRP & Barcode</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
@@ -46,7 +45,7 @@ main{padding:18px;overflow:auto}
 .empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
 .pg{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;overflow:hidden;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;break-after:page;page-break-after:always}
 .pg:last-child{break-after:auto;page-break-after:auto}
-.bcw{width:100%}.bnum{font-weight:700;line-height:1.1;text-align:center;margin-top:.3mm}.pdfmode .lbl,.pdfmode .cell{outline:none!important}.pdfmode .pg{box-shadow:none!important;margin:0!important}
+.bcw{width:100%}.lbl{contain:layout style}.bnum{font-weight:700;line-height:1.1;text-align:center;margin-top:.3mm}.pdfmode .lbl,.pdfmode .cell{outline:none!important}.pdfmode .pg{box-shadow:none!important;margin:0!important}
 #pimgs{display:none}@media print{.pimode .app,.pimode .top{display:none!important}.pimode #pimgs{display:block}#pimgs img{display:block;break-after:page;page-break-after:always}#pimgs img:last-child{break-after:auto;page-break-after:auto}}.lbl{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .lbl{overflow:hidden;position:relative;break-inside:avoid;page-break-inside:avoid;font-family:Arial,sans-serif;color:#000}
 .lbl svg{max-width:100%}
@@ -368,42 +367,79 @@ function render(full){
   if(c.err)s.outerHTML=`<span class="ex" style="color:#b00">Invalid ${type}: ${esc(v)}</span>`;
  });
  const FM=$("fit").value;if(FM!=="off"){
-  let shr=99;const fc=new Map(),ov=l=>l.scrollHeight>l.clientHeight+1||l.scrollWidth>l.clientWidth+1;
+  let shr=99;const fc=new Map(),ov=l=>l.scrollHeight>l.clientHeight+1||l.scrollWidth>l.clientWidth+1,setF=(l,f)=>{l.style.fontSize=f+"pt"};
   document.querySelectorAll(".lbl").forEach(l=>{
    const key=l.innerHTML+l.className+l.style.cssText,sv=l.querySelector("svg.bcode"),hit=fc.get(key);
-   if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;if(sv&&hit.hh){sv.style.height=hit.hh;if(parseFloat(hit.hh)<(+$("bh").value||10))shr=Math.min(shr,parseFloat(hit.hh))}return}
-   let f=parseFloat(l.style.fontSize),n=0;
-   if(FM==="grow"&&!ov(l)){let g=0;while(f<24&&g++<48){l.style.fontSize=(f+.5)+"pt";if(ov(l)){l.style.fontSize=f+"pt";break}f+=.5}}
-   else while(ov(l)&&f>3.5&&n++<30){f=Math.max(3.5,f*Math.max(.8,Math.min(l.clientHeight/l.scrollHeight,l.clientWidth/l.scrollWidth)*.97));l.style.fontSize=f+"pt"}
-   let w=100;
-   while(sv&&ov(l)&&w>35){w-=10;sv.style.width=w+"%"}
-   let hh=sv?parseFloat(sv.style.height):0;const h0=hh;while(sv&&ov(l)&&hh>4){hh-=1;sv.style.height=hh+"mm"}if(sv&&hh<h0)shr=Math.min(shr,hh);
-   fc.set(key,{f:l.style.fontSize,w:sv&&w<100?sv.style.width:"",hh:sv?sv.style.height:""});
+   if(hit){setF(l,hit.f);if(sv){if(hit.w)sv.style.width=hit.w;if(hit.hh){sv.style.height=hit.hh;if(parseFloat(hit.hh)<(+$("bh").value||10))shr=Math.min(shr,parseFloat(hit.hh))}}return}
+   const f0=parseFloat(l.style.fontSize);let lo,hi;
+   if(!ov(l)){if(FM==="grow"){lo=f0;hi=24;while(hi-lo>.25){const m=(lo+hi)/2;setF(l,m);if(ov(l))hi=m;else lo=m}setF(l,lo)}}
+   else{lo=3.5;hi=f0;setF(l,lo);if(!ov(l)){while(hi-lo>.25){const m=(lo+hi)/2;setF(l,m);if(ov(l))hi=m;else lo=m}setF(l,lo)}}
+   let w=100;while(sv&&ov(l)&&w>35){w-=10;sv.style.width=w+"%"}
+   const h0=sv?parseFloat(sv.style.height):0;let hh=h0;while(sv&&ov(l)&&hh>4){hh-=1;sv.style.height=hh+"mm"}
+   if(sv&&hh<h0)shr=Math.min(shr,hh);
+   fc.set(key,{f:parseFloat(l.style.fontSize),w:sv&&w<100?sv.style.width:"",hh:sv?sv.style.height:""});
   });
   if(shr<99)$("count").textContent+=` · barcode height limited to ${shr.toFixed(0)} mm so everything fits the label (set Auto-fit to Off, or increase label height)`;
  }
 }
+function drawPage(pg,S){
+ const R=pg.getBoundingClientRect(),cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(R.width*S));cv.height=Math.max(1,Math.round(R.height*S));
+ const x=cv.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,cv.width,cv.height);x.scale(S,S);
+ const ox=R.left,oy=R.top,CL=v=>v==="rgba(0, 0, 0, 0)"||v==="transparent";
+ const bar=r=>{const l=Math.round((r.left-ox)*S)/S,q=Math.round((r.right-ox)*S)/S,t=Math.round((r.top-oy)*S)/S,b=Math.round((r.bottom-oy)*S)/S;x.fillRect(l,t,Math.max(1/S,q-l),Math.max(1/S,b-t))};
+ const text=(n,cs,ul)=>{
+  const s=n.nodeValue;if(!s.trim())return;const fs=parseFloat(cs.fontSize);
+  x.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;x.fillStyle=cs.color;
+  const asc=x.measureText("Hg").fontBoundingBoxAscent||fs*.8,rg=document.createRange(),re=/\S+/g,lines=[];let m,cur=null;
+  const add=(str,q,sp)=>{if(!q||(!q.width&&!q.height))return;if(cur&&Math.abs(q.top-cur.top)<fs*.4){cur.s+=(sp?" ":"")+str;cur.right=q.right}else{cur={s:str,left:q.left,right:q.right,top:q.top,bot:q.bottom};lines.push(cur)}};
+  while((m=re.exec(s))){rg.setStart(n,m.index);rg.setEnd(n,m.index+m[0].length);const rs=rg.getClientRects();
+   if(rs.length<=1)add(m[0],rs[0]||rg.getBoundingClientRect(),true);
+   else for(let k=0;k<m[0].length;k++){rg.setStart(n,m.index+k);rg.setEnd(n,m.index+k+1);add(m[0][k],rg.getBoundingClientRect(),k===0)}}
+  const bgc=cs.backgroundColor,hl=cs.display==="inline"&&!CL(bgc);
+  for(const L of lines){if(hl){x.fillStyle=bgc;x.fillRect(L.left-ox,L.top-oy,L.right-L.left,L.bot-L.top);x.fillStyle=cs.color}
+   const by=L.top-oy+asc;x.fillText(L.s,L.left-ox,by);if(ul)x.fillRect(L.left-ox,by+fs*.1,x.measureText(L.s).width,Math.max(.6,fs/16))}
+ };
+ const walk=(el,ul)=>{
+  const cs=getComputedStyle(el);if(cs.display==="none"||cs.visibility==="hidden")return;
+  if(el.tagName.toLowerCase()==="svg"){if(el.classList.contains("bcode")||el.classList.contains("bc")){x.fillStyle="#000";el.querySelectorAll("rect").forEach(q=>{if(q.getAttribute("width")!=="100%")bar(q.getBoundingClientRect())})}return}
+  const r=el.getBoundingClientRect(),inl=cs.display==="inline";x.save();
+  if(!inl&&(cs.overflowX!=="visible"||cs.overflowY!=="visible"||(cs.webkitLineClamp&&cs.webkitLineClamp!=="none"))){x.beginPath();x.rect(r.left-ox,r.top-oy,r.width,r.height);x.clip()}
+  if(!inl){
+   if(!CL(cs.backgroundColor)){x.fillStyle=cs.backgroundColor;x.fillRect(r.left-ox,r.top-oy,r.width,r.height)}
+   const bd=(w,st,c,l,t,ww,hh)=>{w=parseFloat(w)||0;if(w>0&&st!=="none"&&!CL(c)){x.fillStyle=c;x.fillRect(l-ox,t-oy,ww(w),hh(w))}};
+   bd(cs.borderTopWidth,cs.borderTopStyle,cs.borderTopColor,r.left,r.top,()=>r.width,w=>w);
+   bd(cs.borderBottomWidth,cs.borderBottomStyle,cs.borderBottomColor,r.left,r.bottom-(parseFloat(cs.borderBottomWidth)||0),()=>r.width,w=>w);
+   bd(cs.borderLeftWidth,cs.borderLeftStyle,cs.borderLeftColor,r.left,r.top,w=>w,()=>r.height);
+   bd(cs.borderRightWidth,cs.borderRightStyle,cs.borderRightColor,r.right-(parseFloat(cs.borderRightWidth)||0),r.top,w=>w,()=>r.height);
+  }
+  const u=ul||cs.textDecorationLine.includes("underline");
+  for(const n of el.childNodes){if(n.nodeType===3)text(n,cs,u);else if(n.nodeType===1)walk(n,u)}
+  x.restore();
+ };
+ walk(pg,false);return cv;
+}
 async function snap(btn,label){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
- render(true);await new Promise(r=>setTimeout(r,80));
+ render(true);await new Promise(r=>setTimeout(r,30));
  const pages=[...document.querySelectorAll("#sheet .pg")];if(!pages.length)throw new Error("Nothing to export yet");
- document.body.classList.add("pdfmode");const cache=new Map(),list=[];
- try{for(let i=0;i<pages.length;i++){btn.textContent=`${label} ${i+1}/${pages.length}`;
+ const cache=new Map(),list=[];
+ for(let i=0;i<pages.length;i++){
+  if(i%6===0){btn.textContent=`${label} ${i+1}/${pages.length}`;await new Promise(r=>setTimeout(r))}
   const k=pages[i].innerHTML;let r=cache.get(k);
-  if(!r){const c=await html2canvas(pages[i],{scale:4,backgroundColor:"#fff",logging:false});r={url:c.toDataURL("image/png"),h:PW*c.height/c.width};cache.set(k,r)}
-  list.push(r)}}finally{document.body.classList.remove("pdfmode")}
+  if(!r){const c=drawPage(pages[i],300/96);r={id:"p"+cache.size,url:c.toDataURL("image/png"),h:PW*c.height/c.width};cache.set(k,r)}
+  list.push(r)}
  return{PW,PH,list};
 }
 async function toPDF(){const b=$("pdfBtn"),t=b.textContent;b.disabled=true;
- try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
+ try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
  render();b.disabled=false;b.textContent=t}
 async function printNow(){
  const b=$("printBtn"),t=b.textContent;b.disabled=true;
  try{
   const{PW,PH,list}=await snap(b,"Preparing");calib=false;
-  const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});
+  const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});
   const url=URL.createObjectURL(doc.output("blob"));
   const old=document.getElementById("pfrm");if(old)old.remove();
   const f=document.createElement("iframe");f.id="pfrm";f.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";

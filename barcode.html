@@ -2,7 +2,6 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Real-time Barcode – Label Studio</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#eef1ee;--panel:#fff;--ink:#14231c;--mute:#5d6b63;--line:#d5dcd6;--brand:#0f6b4f;--brand2:#e9f4ef}
@@ -126,27 +125,64 @@ function render(){
   if(!c.err&&!s.getAttribute("viewBox"))s.setAttribute("viewBox",`0 0 ${s.getAttribute("width")||200} ${s.getAttribute("height")||60}`);
   if(c.err)s.outerHTML=`<div class="err">Cannot make a ${c.f} barcode from "${esc(v)}"</div>`});
 }
+function drawPage(pg,S){
+ const R=pg.getBoundingClientRect(),cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(R.width*S));cv.height=Math.max(1,Math.round(R.height*S));
+ const x=cv.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,cv.width,cv.height);x.scale(S,S);
+ const ox=R.left,oy=R.top,CL=v=>v==="rgba(0, 0, 0, 0)"||v==="transparent";
+ const bar=r=>{const l=Math.round((r.left-ox)*S)/S,q=Math.round((r.right-ox)*S)/S,t=Math.round((r.top-oy)*S)/S,b=Math.round((r.bottom-oy)*S)/S;x.fillRect(l,t,Math.max(1/S,q-l),Math.max(1/S,b-t))};
+ const text=(n,cs,ul)=>{
+  const s=n.nodeValue;if(!s.trim())return;const fs=parseFloat(cs.fontSize);
+  x.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;x.fillStyle=cs.color;
+  const asc=x.measureText("Hg").fontBoundingBoxAscent||fs*.8,rg=document.createRange(),re=/\S+/g,lines=[];let m,cur=null;
+  const add=(str,q,sp)=>{if(!q||(!q.width&&!q.height))return;if(cur&&Math.abs(q.top-cur.top)<fs*.4){cur.s+=(sp?" ":"")+str;cur.right=q.right}else{cur={s:str,left:q.left,right:q.right,top:q.top,bot:q.bottom};lines.push(cur)}};
+  while((m=re.exec(s))){rg.setStart(n,m.index);rg.setEnd(n,m.index+m[0].length);const rs=rg.getClientRects();
+   if(rs.length<=1)add(m[0],rs[0]||rg.getBoundingClientRect(),true);
+   else for(let k=0;k<m[0].length;k++){rg.setStart(n,m.index+k);rg.setEnd(n,m.index+k+1);add(m[0][k],rg.getBoundingClientRect(),k===0)}}
+  const bgc=cs.backgroundColor,hl=cs.display==="inline"&&!CL(bgc);
+  for(const L of lines){if(hl){x.fillStyle=bgc;x.fillRect(L.left-ox,L.top-oy,L.right-L.left,L.bot-L.top);x.fillStyle=cs.color}
+   const by=L.top-oy+asc;x.fillText(L.s,L.left-ox,by);if(ul)x.fillRect(L.left-ox,by+fs*.1,x.measureText(L.s).width,Math.max(.6,fs/16))}
+ };
+ const walk=(el,ul)=>{
+  const cs=getComputedStyle(el);if(cs.display==="none"||cs.visibility==="hidden")return;
+  if(el.tagName.toLowerCase()==="svg"){if(el.classList.contains("bcode")||el.classList.contains("bc")){x.fillStyle="#000";el.querySelectorAll("rect").forEach(q=>{if(q.getAttribute("width")!=="100%")bar(q.getBoundingClientRect())})}return}
+  const r=el.getBoundingClientRect(),inl=cs.display==="inline";x.save();
+  if(!inl&&(cs.overflowX!=="visible"||cs.overflowY!=="visible"||(cs.webkitLineClamp&&cs.webkitLineClamp!=="none"))){x.beginPath();x.rect(r.left-ox,r.top-oy,r.width,r.height);x.clip()}
+  if(!inl){
+   if(!CL(cs.backgroundColor)){x.fillStyle=cs.backgroundColor;x.fillRect(r.left-ox,r.top-oy,r.width,r.height)}
+   const bd=(w,st,c,l,t,ww,hh)=>{w=parseFloat(w)||0;if(w>0&&st!=="none"&&!CL(c)){x.fillStyle=c;x.fillRect(l-ox,t-oy,ww(w),hh(w))}};
+   bd(cs.borderTopWidth,cs.borderTopStyle,cs.borderTopColor,r.left,r.top,()=>r.width,w=>w);
+   bd(cs.borderBottomWidth,cs.borderBottomStyle,cs.borderBottomColor,r.left,r.bottom-(parseFloat(cs.borderBottomWidth)||0),()=>r.width,w=>w);
+   bd(cs.borderLeftWidth,cs.borderLeftStyle,cs.borderLeftColor,r.left,r.top,w=>w,()=>r.height);
+   bd(cs.borderRightWidth,cs.borderRightStyle,cs.borderRightColor,r.right-(parseFloat(cs.borderRightWidth)||0),r.top,w=>w,()=>r.height);
+  }
+  const u=ul||cs.textDecorationLine.includes("underline");
+  for(const n of el.childNodes){if(n.nodeType===3)text(n,cs,u);else if(n.nodeType===1)walk(n,u)}
+  x.restore();
+ };
+ walk(pg,false);return cv;
+}
 async function snap(btn,label){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
- render(true);await new Promise(r=>setTimeout(r,80));
+ render(true);await new Promise(r=>setTimeout(r,30));
  const pages=[...document.querySelectorAll("#sheet .pg")];if(!pages.length)throw new Error("Nothing to export yet");
- document.body.classList.add("pdfmode");const cache=new Map(),list=[];
- try{for(let i=0;i<pages.length;i++){btn.textContent=`${label} ${i+1}/${pages.length}`;
+ const cache=new Map(),list=[];
+ for(let i=0;i<pages.length;i++){
+  if(i%6===0){btn.textContent=`${label} ${i+1}/${pages.length}`;await new Promise(r=>setTimeout(r))}
   const k=pages[i].innerHTML;let r=cache.get(k);
-  if(!r){const c=await html2canvas(pages[i],{scale:4,backgroundColor:"#fff",logging:false});r={url:c.toDataURL("image/png"),h:PW*c.height/c.width};cache.set(k,r)}
-  list.push(r)}}finally{document.body.classList.remove("pdfmode")}
+  if(!r){const c=drawPage(pages[i],300/96);r={id:"p"+cache.size,url:c.toDataURL("image/png"),h:PW*c.height/c.width};cache.set(k,r)}
+  list.push(r)}
  return{PW,PH,list};
 }
 async function toPDF(){const b=$("pdfBtn"),t=b.textContent;b.disabled=true;
- try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
+ try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
  render();b.disabled=false;b.textContent=t}
 async function printNow(){
  const b=$("printBtn"),t=b.textContent;b.disabled=true;
  try{
   const{PW,PH,list}=await snap(b,"Preparing");calib=false;
-  const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h)});
+  const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});
   const url=URL.createObjectURL(doc.output("blob"));
   const old=document.getElementById("pfrm");if(old)old.remove();
   const f=document.createElement("iframe");f.id="pfrm";f.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
