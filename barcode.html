@@ -58,7 +58,11 @@ svg.bc{width:100%;flex:1;min-height:0}
 <select id="mode"><option value="page">Per paper (roll / thermal): fills each paper with barcode boxes</option></select>
 <label class="chk" style="margin:8px 0 2px"><input type="checkbox" id="auto" checked> Auto layout: margin and boxes per paper are set automatically</label>
 <div class="row"><div><label>Barcode box width mm</label><input type="number" id="cw" value="50"></div><div><label>Barcode box height mm</label><input type="number" id="ch" value="30"></div></div>
+<div class="row"><div><label>Barcode width % of box</label><input type="number" id="bw" value="100" min="20" max="100"></div><div><label>Barcode height mm (0 = auto)</label><input type="number" id="bh" value="0" min="0" step="0.5"></div></div>
 <div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="5"></div></div>
+<div class="row"><div><label>Shift X mm (alignment)</label><input type="number" id="sx" value="0" step="0.1"></div><div><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div></div>
+<div class="row"><div><label>Inner padding mm</label><input type="number" id="ip" value="1" step="0.5"></div><div></div></div>
+<button class="alt" id="calBtn" style="margin:6px 0;width:100%">Print calibration test label</button>
 <p class="sub" style="margin:6px 0 0">Box size = label size. Paper 75×50 with box 75×50 gives 1 per paper. Paper 104.8×38 with box 50×38 gives 2 per paper.</p>
 </div></details>
 
@@ -89,10 +93,15 @@ function gen(s,v){const auto=$("fmt").value==="AUTO";let f=fmtFor(v);
  const o=()=>({format:f,displayValue:false,height:60,width:2,margin:0,marginLeft:10,marginRight:10});
  try{JsBarcode(s,v,o())}catch(e){if(auto&&f!=="CODE128"){f="CODE128";try{JsBarcode(s,v,o())}catch(e2){return{err:1,f}}}else return{err:1,f}}
  return{h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
+let calib=false;
+function CAL(w,h,sh){let t="";for(let y=5;y<h;y+=5)t+=`<div style="position:absolute;left:0;top:${y}mm;width:3mm;border-top:.2mm solid #000"></div><div style="position:absolute;left:4mm;top:${y-1.3}mm;font:6pt Arial">${y}</div>`;
+ return `<div style="width:${w}mm;height:${h}mm;flex:none;position:relative;box-sizing:border-box;border:.3mm solid #000${sh}"><div style="position:absolute;top:.5mm;left:50%;font:7pt Arial;transform:translateX(-50%)">TOP edge</div><div style="position:absolute;bottom:.5mm;left:50%;font:7pt Arial;transform:translateX(-50%)">BOTTOM edge</div>${t}</div>`}
 function render(){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
  $("cust").hidden=$("paper").value!=="custom";
  const per=true,AU=$("auto").checked,mg=per&&AU?0:+$("mg").value,gap=+$("gap").value,fs=+$("fs").value,nf=+$("nf").value||10;
+ const bw=+$("bw").value||100,bh=+$("bh").value||0;
+ const sh=(+$("sx").value||+$("sy").value)?`;transform:translate(${+$("sx").value||0}mm,${+$("sy").value||0}mm)`:"",ip=$("ip").value===""?1:+$("ip").value;
  const sty=p=>`font-weight:${$(p+"b").checked?700:400};font-style:${$(p+"i").checked?"italic":"normal"};text-decoration:${$(p+"u").checked?"underline":"none"};color:${$(p+"c").value}`,hl=p=>$(p+"hon").checked?` style="background:${$(p+"h").value}"`:"";
  const fit=(P,l,g)=>{let c=Math.max(1,Math.floor((P+.5)/l));while(c>1&&c*l+(c-1)*g>P+.5)c--;return c};
  const W=per?Math.min(+$("cw").value,PW-2*mg):+$("cw").value,H=per?Math.min(+$("ch").value,PH-2*mg):+$("ch").value;
@@ -100,17 +109,19 @@ function render(){
  const gx=cN>1?Math.max(0,Math.min(gap,(PW-2*mg-cN*W)/(cN-1))):0,gy=rN>1?Math.max(0,Math.min(gap,(PH-2*mg-rN*H)/(rN-1))):0;
  $("mg").disabled=per&&AU;
  const items=[];q.forEach(x=>{for(let i=0;i<x.n;i++)items.push(x)});const d=draft();if(d)for(let i=0;i<d.n;i++)items.push(d);
+ if(calib)items.splice(0,items.length,{cal:1});
  $("pageStyle").textContent=per?`@page{size:${PW}mm ${PH}mm;margin:0}`:`@page{size:${PW}mm ${PH}mm;margin:${mg}mm}`;
  const P=$("paperEl"),S=$("sheet");
  $("count").textContent=items.length?`${items.length} barcode(s)`+(d?" · live preview of what you are typing":""):"Nothing to print yet";
  if(!items.length){P.style.cssText="background:none;box-shadow:none;padding:0;width:auto";S.style.cssText="";S.innerHTML='<div class="empty">Type or scan a barcode value and it will appear here instantly. Then press Print.</div>';return}
- const cell=x=>`<div class="cell" style="width:${W}mm;height:${H}mm;font-family:'${($("ff").value||"Arial").replace(/['";<>]/g,"")}',Arial,sans-serif">${x.t?`<div class="t" style="font-size:${fs}pt;${sty("t")}"><span${hl("t")}>${esc(x.t)}</span></div>`:""}<svg class="bc" data-v="${esc(x.v)}"></svg>${$("txt").checked?`<div class="num" style="font-size:${nf}pt;${sty("n")}"><span${hl("n")}>${esc(x.v)}</span></div>`:""}</div>`;
+ const cell=x=>x.cal?CAL(W,H,sh):`<div class="cell" style="width:${W}mm;height:${H}mm;padding:${ip}mm${sh};font-family:'${($("ff").value||"Arial").replace(/['";<>]/g,"")}',Arial,sans-serif">${x.t?`<div class="t" style="font-size:${fs}pt;${sty("t")}"><span${hl("t")}>${esc(x.t)}</span></div>`:""}<svg class="bc" data-v="${esc(x.v)}" style="width:${bw}%${bh?`;height:${Math.min(bh,H*.85)}mm;flex:none`:""}"${bh?' preserveAspectRatio="none"':""}></svg>${$("txt").checked?`<div class="num" style="font-size:${nf}pt;${sty("n")}"><span${hl("n")}>${esc(x.v)}</span></div>`:""}</div>`;
  if(per){P.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";S.style.cssText="display:block";
   S.innerHTML=items.map(x=>`<div class="pg" style="width:${PW}mm;height:${PH-0.4}mm;padding:${mg}mm;display:flex;flex-wrap:wrap;justify-content:center;align-content:center;gap:${gy}mm ${gx}mm">${Array(nPer).fill(cell(x)).join("")}</div>`).join("")}
  else{P.style.cssText=`padding:${mg}mm;width:${PW}mm;min-height:${PH}mm`;S.style.cssText=`display:flex;flex-wrap:wrap;gap:${gap}mm;align-content:flex-start;width:${PW-2*mg}mm`;S.innerHTML=items.map(cell).join("")}
  const cache=new Map();
  document.querySelectorAll("svg.bc").forEach(s=>{const v=s.dataset.v;let c=cache.get(v);
   if(!c){c=gen(s,v);cache.set(v,c)}else if(!c.err){c.a.forEach(([n,x])=>s.setAttribute(n,x));s.innerHTML=c.h}
+  if(!c.err&&!s.getAttribute("viewBox"))s.setAttribute("viewBox",`0 0 ${s.getAttribute("width")||200} ${s.getAttribute("height")||60}`);
   if(c.err)s.outerHTML=`<div class="err">Cannot make a ${c.f} barcode from "${esc(v)}"</div>`});
 }
 async function snap(btn,label){
@@ -133,11 +144,12 @@ async function printNow(){const b=$("printBtn"),t=b.textContent;b.disabled=true;
   await Promise.all([...$("pimgs").querySelectorAll("img")].map(i=>i.decode().catch(()=>0)));
   document.body.classList.add("pimode");window.print()}catch(e){alert("Print error: "+e.message)}
  render();b.disabled=false;b.textContent=t}
-window.addEventListener("afterprint",()=>{document.body.classList.remove("pimode");$("pimgs").innerHTML=""});
+window.addEventListener("afterprint",()=>{document.body.classList.remove("pimode");$("pimgs").innerHTML="";if(calib){calib=false;render()}});
+$("calBtn").onclick=()=>{calib=true;printNow()};
 $("pdfBtn").onclick=toPDF;$("printBtn").onclick=printNow;
 $("val").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
 $("ttl").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit()}});
 
-["ff","auto","paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","fs","nf","nb","ni","nu","nc","nhon","nh","tb","ti","tu","tc","thon","th"].forEach(id=>$(id).addEventListener("input",render));
+["ff","auto","paper","pw","ph","mode","cw","ch","gap","mg","val","ttl","cpy","fmt","txt","sx","sy","ip","bw","bh","fs","nf","nb","ni","nu","nc","nhon","nh","tb","ti","tu","tc","thon","th"].forEach(id=>$(id).addEventListener("input",render));
 render();
 </script></body></html>
