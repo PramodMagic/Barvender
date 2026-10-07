@@ -360,7 +360,7 @@ function render(full){
  document.querySelectorAll(".bcode").forEach(s=>{
   const v=s.dataset.v;let c=bcache.get(v);
   if(!c){
-   try{JsBarcode(s,v,opts);c={h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
+   try{const st0=s.getAttribute("style");JsBarcode(s,v,opts);if(st0)s.setAttribute("style",st0);c={h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
    catch(e){c={err:1}}
    bcache.set(v,c);
   }else if(!c.err){c.a.forEach(([n,x])=>s.setAttribute(n,x));s.innerHTML=c.h}
@@ -368,18 +368,19 @@ function render(full){
   if(c.err)s.outerHTML=`<span class="ex" style="color:#b00">Invalid ${type}: ${esc(v)}</span>`;
  });
  const FM=$("fit").value;if(FM!=="off"){
-  const fc=new Map(),ov=l=>l.scrollHeight>l.clientHeight+1||l.scrollWidth>l.clientWidth+1;
+  let shr=99;const fc=new Map(),ov=l=>l.scrollHeight>l.clientHeight+1||l.scrollWidth>l.clientWidth+1;
   document.querySelectorAll(".lbl").forEach(l=>{
    const key=l.innerHTML+l.className+l.style.cssText,sv=l.querySelector("svg.bcode"),hit=fc.get(key);
-   if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;if(sv&&hit.hh)sv.style.height=hit.hh;return}
+   if(hit){l.style.fontSize=hit.f;if(sv&&hit.w)sv.style.width=hit.w;if(sv&&hit.hh){sv.style.height=hit.hh;if(parseFloat(hit.hh)<(+$("bh").value||10))shr=Math.min(shr,parseFloat(hit.hh))}return}
    let f=parseFloat(l.style.fontSize),n=0;
    if(FM==="grow"&&!ov(l)){let g=0;while(f<24&&g++<48){l.style.fontSize=(f+.5)+"pt";if(ov(l)){l.style.fontSize=f+"pt";break}f+=.5}}
    else while(ov(l)&&f>3.5&&n++<30){f=Math.max(3.5,f*Math.max(.8,Math.min(l.clientHeight/l.scrollHeight,l.clientWidth/l.scrollWidth)*.97));l.style.fontSize=f+"pt"}
    let w=100;
    while(sv&&ov(l)&&w>35){w-=10;sv.style.width=w+"%"}
-   let hh=sv?parseFloat(sv.style.height):0;while(sv&&ov(l)&&hh>4){hh-=1;sv.style.height=hh+"mm"}
+   let hh=sv?parseFloat(sv.style.height):0;const h0=hh;while(sv&&ov(l)&&hh>4){hh-=1;sv.style.height=hh+"mm"}if(sv&&hh<h0)shr=Math.min(shr,hh);
    fc.set(key,{f:l.style.fontSize,w:sv&&w<100?sv.style.width:"",hh:sv?sv.style.height:""});
   });
+  if(shr<99)$("count").textContent+=` · barcode height limited to ${shr.toFixed(0)} mm so everything fits the label (set Auto-fit to Off, or increase label height)`;
  }
 }
 async function snap(btn,label){

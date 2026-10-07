@@ -89,9 +89,10 @@ const fmtFor=v=>{const f=$("fmt").value;return f!=="AUTO"?f:/^\d{13}$/.test(v)?"
 const draft=()=>{const v=$("val").value.trim();return v?{v,t:$("ttl").value.trim(),n:Math.max(1,+$("cpy").value||1)}:null};
 function commit(){if(!draft())return;printNow()}
 window.addEventListener("afterprint",()=>{$("val").focus();$("val").select()});
-function gen(s,v){const auto=$("fmt").value==="AUTO";let f=fmtFor(v);
+function gen(s,v){const st0=s.getAttribute("style"),auto=$("fmt").value==="AUTO";let f=fmtFor(v);
  const o=()=>({format:f,displayValue:false,height:60,width:2,margin:0,marginLeft:10,marginRight:10});
  try{JsBarcode(s,v,o())}catch(e){if(auto&&f!=="CODE128"){f="CODE128";try{JsBarcode(s,v,o())}catch(e2){return{err:1,f}}}else return{err:1,f}}
+ if(st0)s.setAttribute("style",st0);
  return{h:s.innerHTML,a:[...s.attributes].filter(a=>!/^(class|data-v|style)$/.test(a.name)).map(a=>[a.name,a.value])}}
 let calib=false;
 function CAL(w,h,sh){let t="";for(let y=5;y<h;y+=5)t+=`<div style="position:absolute;left:0;top:${y}mm;width:3mm;border-top:.2mm solid #000"></div><div style="position:absolute;left:4mm;top:${y-1.3}mm;font:6pt Arial">${y}</div>`;
