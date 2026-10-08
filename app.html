@@ -382,10 +382,11 @@ function render(full){
   if(shr<99)$("count").textContent+=` · barcode height limited to ${shr.toFixed(0)} mm so everything fits the label (set Auto-fit to Off, or increase label height)`;
  }
 }
+function addTxt(doc,r){const k=25.4/96;doc.setFont("helvetica","normal");(r.T||[]).forEach(t=>{try{doc.setFontSize(Math.max(1,t.fs*.75));doc.text(String(t.s),t.l*k,t.b*k,{renderingMode:"invisible"})}catch(e){}})}
 function drawPage(pg,S){
  const R=pg.getBoundingClientRect(),cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(R.width*S));cv.height=Math.max(1,Math.round(R.height*S));
  const x=cv.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,cv.width,cv.height);x.scale(S,S);
- const ox=R.left,oy=R.top,CL=v=>v==="rgba(0, 0, 0, 0)"||v==="transparent";
+ const T=[],ox=R.left,oy=R.top,CL=v=>v==="rgba(0, 0, 0, 0)"||v==="transparent";
  const bar=r=>{const l=Math.round((r.left-ox)*S)/S,q=Math.round((r.right-ox)*S)/S,t=Math.round((r.top-oy)*S)/S,b=Math.round((r.bottom-oy)*S)/S;x.fillRect(l,t,Math.max(1/S,q-l),Math.max(1/S,b-t))};
  const text=(n,cs,ul)=>{
   const s=n.nodeValue;if(!s.trim())return;const fs=parseFloat(cs.fontSize);
@@ -397,13 +398,14 @@ function drawPage(pg,S){
    else for(let k=0;k<m[0].length;k++){rg.setStart(n,m.index+k);rg.setEnd(n,m.index+k+1);add(m[0][k],rg.getBoundingClientRect(),k===0)}}
   const bgc=cs.backgroundColor,hl=cs.display==="inline"&&!CL(bgc);
   for(const L of lines){if(hl){x.fillStyle=bgc;x.fillRect(L.left-ox,L.top-oy,L.right-L.left,L.bot-L.top);x.fillStyle=cs.color}
-   const by=L.top-oy+asc;x.fillText(L.s,L.left-ox,by);if(ul)x.fillRect(L.left-ox,by+fs*.1,x.measureText(L.s).width,Math.max(.6,fs/16))}
+   const by=L.top-oy+asc;x.fillText(L.s,L.left-ox,by);T.push({s:L.s,l:L.left-ox,b:by,fs});if(ul)x.fillRect(L.left-ox,by+fs*.1,x.measureText(L.s).width,Math.max(.6,fs/16))}
  };
  const walk=(el,ul)=>{
   const cs=getComputedStyle(el);if(cs.display==="none"||cs.visibility==="hidden")return;
   if(el.tagName.toLowerCase()==="svg"){
    if(el.classList.contains("bcode")||el.classList.contains("bc")){
     const vb=(el.getAttribute("viewBox")||"").trim().split(/[\s,]+/).map(Number),sr=el.getBoundingClientRect();
+    if(el.dataset&&el.dataset.v)T.push({s:el.dataset.v,l:sr.left-ox,b:sr.bottom-oy,fs:8});
     if(vb.length===4&&vb[2]>0&&vb[3]>0){const sx=sr.width/vb[2],sy=sr.height/vb[3];x.fillStyle="#000";
      el.querySelectorAll("rect").forEach(q=>{if(q.parentNode===el)return;const ws=q.getAttribute("width")||"",w=parseFloat(ws),h=parseFloat(q.getAttribute("height"));
       if(!(w>0&&h>0)||ws.includes("%"))return;
@@ -425,7 +427,7 @@ function drawPage(pg,S){
   for(const n of el.childNodes){if(n.nodeType===3)text(n,cs,u);else if(n.nodeType===1)walk(n,u)}
   x.restore();
  };
- walk(pg,false);return cv;
+ walk(pg,false);cv.T=T;return cv;
 }
 async function snap(btn,label){
  const [PW,PH]=$("paper").value==="custom"?[+$("pw").value,+$("ph").value]:$("paper").value.split(",").map(Number);
@@ -435,20 +437,20 @@ async function snap(btn,label){
  for(let i=0;i<pages.length;i++){
   if(i%6===0){btn.textContent=`${label} ${i+1}/${pages.length}`;await new Promise(r=>setTimeout(r))}
   const k=pages[i].innerHTML;let r=cache.get(k);
-  if(!r){const c=drawPage(pages[i],300/96);r={id:"p"+cache.size,url:c.toDataURL("image/png"),h:PW*c.height/c.width};cache.set(k,r)}
+  if(!r){const c=drawPage(pages[i],300/96);r={id:"p"+cache.size,url:c.toDataURL("image/png"),h:PW*c.height/c.width,T:c.T};cache.set(k,r)}
   list.push(r)}
  return{PW,PH,list};
 }
 async function toPDF(){const b=$("pdfBtn"),t=b.textContent;b.disabled=true;
  try{const{PW,PH,list}=await snap(b,"PDF");const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST");addTxt(doc,r)});doc.save("labels.pdf")}catch(e){alert("PDF error: "+e.message)}
  render();b.disabled=false;b.textContent=t}
 async function printNow(){
  const b=$("printBtn"),t=b.textContent;b.disabled=true;
  try{
   const{PW,PH,list}=await snap(b,"Preparing");calib=false;
   const o=PW>PH?"l":"p",doc=new window.jspdf.jsPDF({compress:true,unit:"mm",format:[PW,PH],orientation:o});
-  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST")});
+  list.forEach((r,i)=>{if(i)doc.addPage([PW,PH],o);doc.addImage(r.url,"PNG",0,0,PW,r.h,r.id,"FAST");addTxt(doc,r)});
   const url=URL.createObjectURL(doc.output("blob"));
   const old=document.getElementById("pfrm");if(old)old.remove();
   const f=document.createElement("iframe");f.id="pfrm";f.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
