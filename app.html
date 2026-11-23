@@ -101,7 +101,7 @@ main{padding:18px;overflow:auto}
   <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
   <div class="row" style="margin-top:6px"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
   <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear my saved data</button>
-  <p class="sub" style="margin:6px 0 0">Upload once and the records are saved. Next time just open the tool and search. Same SKU/ASIN with changed values are replaced, new ones are added. Every workspace name keeps its own separate data, and clearing affects only your own workspace.</p>
+  <p class="sub" style="margin:6px 0 0">Upload once and the records are saved (a private workspace name was created for this browser; type the same name on another PC to share the data). Next time just open the tool and search. Same SKU/ASIN with changed values are replaced, new ones are added. Every workspace name keeps its own separate data, and clearing affects only your own workspace.</p>
  </div></details>
 
  <details open><summary>Records: search &amp; select to print</summary><div class="body">
@@ -482,6 +482,7 @@ const fmtB=b=>b>=1048576?(b/1048576).toFixed(1)+" MB":Math.round(b/1024)+" KB";
 function modal(t,h){$("mt").textContent=t;$("mb").innerHTML=h;$("modal").classList.add("on")}
 $("mx").onclick=()=>$("modal").classList.remove("on");
 let WS=localStorage.getItem("ls_ws")||"",lockedKey="",rowsFromCloud=false;
+if(!WS){WS="ws-"+Math.random().toString(36).slice(2,10);localStorage.setItem("ls_ws",WS)}
 const wsClean=v=>String(v||"").toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40);
 const idbOpen=()=>new Promise((res,rej)=>{const o=indexedDB.open("ls_cache",1);o.onupgradeneeded=()=>o.result.createObjectStore("kv");o.onsuccess=()=>res(o.result);o.onerror=()=>rej(o.error)});
 const idbGet=async k=>{try{const d=await idbOpen();return await new Promise(r=>{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}};
@@ -512,7 +513,7 @@ function afterLoad(fromFile){
  if(fromFile)rowsFromCloud=false;
  const k=$("ckey");k.innerHTML=cols.map(c=>`<option>${esc(c)}</option>`).join("");
  const sv=localStorage.getItem("ls_kc");k.value=cols.includes(sv)?sv:(cols.find(c=>/^sku/i.test(c))||cols.find(c=>/asin/i.test(c))||cols[0]||"");lockKey();
- if(fromFile){if(!WS)$("cst").textContent="Type a workspace name above and press Use to save this file.";else if($("cauto").checked&&rows.length)cloudSync()}
+ if(fromFile){idbSet("local_last",{rows,info:$("fileInfo").textContent});if($("cauto").checked&&rows.length)cloudSync()}
 }
 $("ckey").onchange=()=>localStorage.setItem("ls_kc",$("ckey").value);
 function clearRows(){rows=[];cols=[];sel=new Set();hay=null;cop.clear();pick.clear();buildCols();renderRecs();render();$("fileInfo").textContent="No file uploaded yet."}
@@ -523,15 +524,21 @@ function install(data,s){
  $("fileInfo").textContent=`Saved data loaded: ${rows.length.toLocaleString()} records. Search to print.`;
  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();afterLoad(false)
 }
+async function loadLocal(){
+ const c=await idbGet("local_last");if(!c||!c.rows||!c.rows.length)return false;
+ rows=c.rows;cols=Object.keys(rows[0]);applyOrder();sel=initSel();rowsFromCloud=false;
+ $("fileInfo").textContent="Restored from this browser: "+(c.info||"last file")+" (not saved in storage)";
+ hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();afterLoad(false);return true
+}
 async function loadSaved(manual){
  if(!WS)return;const b=$("cload"),t0=b.textContent;b.disabled=true;
  try{
-  const s=await cloudStatus(!manual);if(!s){b.disabled=false;return}
-  if(!s.count){if(rowsFromCloud)clearRows();if(manual)modal("Nothing saved yet","<p>Upload an Excel file. It is saved automatically, and next time you only need to search.</p>");b.disabled=false;return}
+  const s=await cloudStatus(!manual);if(!s){if(!rows.length)await loadLocal();b.disabled=false;return}
+  if(!s.count){if(rowsFromCloud)clearRows();if(!rows.length&&await loadLocal()){b.disabled=false;return}if(manual)modal("Nothing saved yet","<p>Upload an Excel file. It is saved automatically, and next time you only need to search.</p>");b.disabled=false;return}
   const ver=WS+"|"+((s.meta&&s.meta.updatedAt)||"")+"|"+s.count;let data=null;const c=await idbGet("cache_"+WS);if(c&&c.ver===ver)data=c.rows;
   if(!data){const mp=new Map();let cur="0";do{b.textContent=`Loading ${mp.size}/${s.count}`;const r=await cloud({action:"page",cursor:cur});r.items.forEach(([k,v])=>mp.set(k,v));cur=r.cursor}while(cur!=="0");data=[...mp.values()];await idbSet("cache_"+WS,{ver,rows:data})}
   install(data,s)
- }catch(e){failPopup(e,"Load")}
+ }catch(e){failPopup(e,"Load");if(!rows.length)await loadLocal()}
  b.disabled=false;b.textContent=t0
 }
 async function cloudSync(){
@@ -565,7 +572,7 @@ $("cwsb").onclick=()=>{const v=wsClean($("cws").value);if(v.length<3)return moda
 $("cws").onkeydown=e=>{if(e.key==="Enter")$("cwsb").click()};
 const updClr=()=>{$("cclr").textContent=WS?`Clear my saved data (${WS})`:"Clear my saved data"};
 $("cclr").onclick=async()=>{if(!WS)return;const t=prompt('This deletes ALL saved data of workspace "'+WS+'" only. Other workspaces are not touched.\nThis cannot be undone. Type the workspace name to confirm:');if(t===null||wsClean(t)!==WS){if(t!==null)modal("Not cleared","<p>The name did not match, so nothing was deleted.</p>");return}
- try{await cloud({action:"clear"});await idbSet("cache_"+WS,null);lockedKey="";if(rowsFromCloud)clearRows();await cloudStatus();lockKey()}catch(e){failPopup(e,"Clear")}};
+ try{await cloud({action:"clear"});await idbSet("cache_"+WS,null);await idbSet("local_last",null);lockedKey="";if(rowsFromCloud)clearRows();await cloudStatus();lockKey()}catch(e){failPopup(e,"Clear")}};
 $("cws").value=WS;updClr();if(WS)loadSaved(false);else cloudStatus();
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
