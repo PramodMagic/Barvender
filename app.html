@@ -45,7 +45,8 @@ main{padding:18px;overflow:auto}
 .empty{padding:60px 20px;text-align:center;color:var(--mute);border:2px dashed var(--line);border-radius:10px;background:#fff}
 .pg{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;overflow:hidden;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 12px;break-after:page;page-break-after:always}
 .pg:last-child{break-after:auto;page-break-after:auto}
-.bcw{width:100%}.lbl{contain:layout style}.bnum{font-weight:700;line-height:1.1;text-align:center;margin-top:.3mm}.pdfmode .lbl,.pdfmode .cell{outline:none!important}.pdfmode .pg{box-shadow:none!important;margin:0!important}
+.bcw{width:100%}
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center}#modal.on{display:flex}.mbox{background:#fff;border-radius:10px;max-width:780px;width:92%;max-height:84vh;overflow:auto;padding:18px}.tb{border-collapse:collapse;font-size:13px;width:100%}.tb td,.tb th{border:1px solid var(--line);padding:4px 8px;text-align:left}.tb th{background:var(--brand2)}.lbl{contain:layout style}.bnum{font-weight:700;line-height:1.1;text-align:center;margin-top:.3mm}.pdfmode .lbl,.pdfmode .cell{outline:none!important}.pdfmode .pg{box-shadow:none!important;margin:0!important}
 #pimgs{display:none}@media print{.pimode .app,.pimode .top{display:none!important}.pimode #pimgs{display:block}#pimgs img{display:block;break-after:page;page-break-after:always}#pimgs img:last-child{break-after:auto;page-break-after:auto}}.lbl{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .lbl{overflow:hidden;position:relative;break-inside:avoid;page-break-inside:avoid;font-family:Arial,sans-serif;color:#000}
 .lbl svg{max-width:100%}
@@ -77,6 +78,7 @@ main{padding:18px;overflow:auto}
 </head>
 <body>
 <div id="pimgs"></div>
+<div id="modal"><div class="mbox"><h3 id="mt" style="margin:0 0 8px"></h3><div id="mb"></div><p style="text-align:right;margin:12px 0 0"><button id="mx">Close</button></p></div></div>
 <nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l on" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a></nav>
 <div class="app">
 <aside>
@@ -88,6 +90,15 @@ main{padding:18px;overflow:auto}
    <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div>
   <p class="sub" id="fileInfo" style="margin:8px 0 6px">No file uploaded yet.</p>
   <button class="alt" id="sampleBtn">Download sample Excel</button>
+ </div></details>
+
+ <details open><summary>Saved data (your Upstash, free plan)</summary><div class="body">
+  <p class="sub" id="cst" style="margin:0 0 6px">Checking…</p>
+  <label>Match records by column (e.g. SKU or ASIN)</label><select id="ckey"></select>
+  <label class="chk"><input type="checkbox" id="cauto" checked> Auto-sync when I upload a file</label>
+  <div class="row" style="margin-top:6px"><button id="csync">Sync file to storage</button><button class="alt" id="cload">Load saved data</button></div>
+  <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear saved data</button>
+  <p class="sub" style="margin:6px 0 0">Records with the same SKU/ASIN are compared. Changed fields are replaced with the new values, new records are added.</p>
  </div></details>
 
  <details open><summary>Records: search &amp; select to print</summary><div class="body">
@@ -251,7 +262,7 @@ function loadFile(f){
   if(!data.length){$("fileInfo").textContent="The file is empty.";return}
   rows=data;cols=Object.keys(rows[0]);sel=new Set(cols);
   $("fileInfo").textContent=`${f.name}: ${rows.length} rows, ${cols.length} columns`;
-  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();
+  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();afterLoad();
  };
  r.readAsArrayBuffer(f);
 }
@@ -462,6 +473,71 @@ async function printNow(){
  const v=document.getElementById("val");if(v){v.focus();v.select()}}
 window.addEventListener("afterprint",()=>{document.body.classList.remove("pimode");$("pimgs").innerHTML=""});
 $("pdfBtn").onclick=toPDF;$("printBtn").onclick=printNow;
+/* ---- cloud storage (Upstash Redis through /api/master) ---- */
+const fmtB=b=>b>=1048576?(b/1048576).toFixed(1)+" MB":Math.round(b/1024)+" KB";
+function modal(t,h){$("mt").textContent=t;$("mb").innerHTML=h;$("modal").classList.add("on")}
+$("mx").onclick=()=>$("modal").classList.remove("on");
+async function cloud(body,silent){
+ for(let t=0;t<2;t++){
+  let r;try{r=await fetch("/api/master",{method:"POST",headers:{"Content-Type":"application/json","x-app-key":sessionStorage.getItem("ls_pw")||""},body:JSON.stringify(body)})}catch(e){throw new Error("Cannot reach the server: "+e.message)}
+  if(r.status===401){if(silent){const e=new Error("Locked: click Load saved data to enter the password");throw e}const k=prompt("Enter the app password");if(k===null)throw new Error("Password required");sessionStorage.setItem("ls_pw",k);continue}
+  if(r.status===404)throw new Error("Storage API not found. Upload the api folder to GitHub and redeploy.");
+  const j=await r.json().catch(()=>({error:"Bad response ("+r.status+")"}));
+  if(!r.ok||j.error){const e=new Error(j.error||"Request failed");e.full=!!j.full;e.kind=j.kind;throw e}
+  return j}
+ throw new Error("Wrong password")
+}
+function failPopup(e,what){
+ if(e.full)modal(e.kind==="requests"?"Storage request limit reached":"Storage is full",`<p>${esc(e.message)}</p><p>${e.kind==="requests"?"The request limit of your Upstash plan is used up. Try again later or upgrade the plan.":"Use <b>Clear saved data</b> to free space, or upgrade your Upstash plan, then sync again."}</p>`);
+ else modal(what+" failed",`<p>${esc(e.message)}</p>`)
+}
+async function cloudStatus(silent){
+ try{const s=await cloud({action:"status"},silent);
+  $("cst").textContent=`Saved: ${s.count.toLocaleString()} records · ${fmtB(s.bytes)} of ${fmtB(s.limit)} used`+(s.protected?"":" · not password-protected (set APP_PASSWORD in Vercel)");return s}
+ catch(e){$("cst").textContent="Saved data: "+e.message}
+}
+function afterLoad(){
+ const sel=$("ckey");sel.innerHTML=cols.map(c=>`<option>${esc(c)}</option>`).join("");
+ const saved=localStorage.getItem("ls_kc");
+ sel.value=cols.includes(saved)?saved:(cols.find(c=>/^sku/i.test(c))||cols.find(c=>/asin/i.test(c))||cols[0]||"");
+ if(window.__fromCloud){window.__fromCloud=false;return}
+ if($("cauto").checked&&sel.value&&rows.length)cloudSync()
+}
+$("ckey").onchange=()=>localStorage.setItem("ls_kc",$("ckey").value);
+async function cloudSync(){
+ if(!rows.length)return modal("No file","<p>Upload an Excel file first.</p>");
+ const kc=$("ckey").value;if(!kc)return modal("Choose a column","<p>Select the column (like SKU or ASIN) that identifies a product.</p>");
+ localStorage.setItem("ls_kc",kc);const b=$("csync"),t0=b.textContent;b.disabled=true;
+ const tot={n:0,u:0,s:0,k:0,d:0},ch=[];let warn="";
+ try{
+  let i=0;while(i<rows.length){let j=i,sz=0;do{sz+=JSON.stringify(rows[j]).length;j++}while(j<rows.length&&j-i<500&&sz<350000);
+   b.textContent=`Syncing ${j}/${rows.length}`;
+   const r=await cloud({action:"sync",keyCol:kc,rows:rows.slice(i,j)});
+   tot.n+=r.new;tot.u+=r.updated;tot.s+=r.unchanged;tot.k+=r.skipped;tot.d+=r.dups;r.changes.forEach(x=>{if(ch.length<400)ch.push(x)});warn=r.warn||warn;i=j}
+  await cloud({action:"meta",keyCol:kc,columns:cols});
+  const flat=[];ch.forEach(x=>x.cs.forEach(c=>flat.push([x.key,c.c,c.o,c.n])));
+  modal(warn?"Sync complete: storage almost full":"Sync complete",
+   `<p><b>${tot.n}</b> new · <b>${tot.u}</b> updated (old values replaced) · <b>${tot.s}</b> unchanged`+(tot.k?` · ${tot.k} skipped (empty ${esc(kc)})`:"")+(tot.d?` · ${tot.d} repeated ${esc(kc)} in the file`:"")+`</p>`
+   +(warn?`<p style="color:#9b1c1c"><b>${esc(warn)}</b></p>`:"")
+   +(flat.length?`<p><b>Changed values</b>${flat.length>=400?" (first 400 shown)":""}</p><table class="tb"><tr><th>${esc(kc)}</th><th>Column</th><th>Old</th><th>New</th></tr>${flat.slice(0,400).map(x=>"<tr>"+x.map(v=>`<td>${esc(v)}</td>`).join("")+"</tr>").join("")}</table>`:"<p>No existing record had changes.</p>"));
+ }catch(e){failPopup(e,"Sync")}
+ b.disabled=false;b.textContent=t0;cloudStatus()
+}
+async function cloudLoad(){
+ const b=$("cload"),t0=b.textContent;b.disabled=true;
+ try{
+  const s=await cloud({action:"status"});if(!s.count){modal("Nothing saved yet","<p>Upload a file and sync it first.</p>");b.disabled=false;return}
+  let cur="0",all=[];do{b.textContent=`Loading ${all.length}/${s.count}`;const r=await cloud({action:"page",cursor:cur});all.push(...r.rows);cur=r.cursor}while(cur!=="0");
+  const present=new Set();all.forEach(r=>Object.keys(r).forEach(k=>present.add(k)));
+  const order=((s.meta&&s.meta.columns)||[]).filter(c=>present.has(c));present.forEach(c=>{if(!order.includes(c))order.push(c)});
+  rows=all;cols=order;sel=new Set(cols);$("fileInfo").textContent=`Loaded from storage: ${rows.length} records`;
+  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();window.__fromCloud=true;afterLoad();
+ }catch(e){failPopup(e,"Load")}
+ b.disabled=false;b.textContent=t0
+}
+$("csync").onclick=cloudSync;$("cload").onclick=cloudLoad;
+$("cclr").onclick=async()=>{if(!confirm("Delete ALL saved data from your Upstash storage? This cannot be undone."))return;try{await cloud({action:"clear"});await cloudStatus()}catch(e){failPopup(e,"Clear")}};
+cloudStatus(true);
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
