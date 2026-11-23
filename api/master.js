@@ -1,7 +1,9 @@
-// Vercel serverless function: saved master data in Upstash Redis (KV_REST_API_URL / KV_REST_API_TOKEN are added by the Upstash integration)
-const HASH = "lm:data", META = "lm:meta", BYTES = "lm:bytes";
+// Vercel serverless function: private "workspaces" of saved master data in Upstash Redis.
+// Env vars added by the Upstash integration: KV_REST_API_URL, KV_REST_API_TOKEN. Optional: APP_PASSWORD, STORAGE_LIMIT_MB.
+const T = "lm:total:bytes";
 const LIMIT = (+process.env.STORAGE_LIMIT_MB || 256) * 1048576;
 const norm = o => { const r = {}; Object.keys(o).sort().forEach(c => { r[c] = String(o[c] == null ? "" : o[c]).trim(); }); return r; };
+const fail = (msg, extra) => Object.assign(new Error(msg), extra || {});
 
 async function rc(cmds) {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -20,10 +22,13 @@ module.exports = async (req, res) => {
   if (pw && req.headers["x-app-key"] !== pw) return res.status(401).json({ error: "Unauthorized" });
   try {
     const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const ws = String(b.ws || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
+    if (ws.length < 3) throw new Error("Workspace name is required (at least 3 letters or numbers).");
+    const H = "lm:" + ws + ":data", M = "lm:" + ws + ":meta", B = "lm:" + ws + ":bytes";
     switch (b.action) {
       case "status": {
-        const [n, by, m] = await rc([["HLEN", HASH], ["GET", BYTES], ["GET", META]]);
-        return res.json({ count: n || 0, bytes: Math.max(0, +by || 0), limit: LIMIT, meta: m ? JSON.parse(m) : null, protected: !!pw });
+        const [n, by, m, tot] = await rc([["HLEN", H], ["GET", B], ["GET", M], ["GET", T]]);
+        return res.json({ count: n || 0, bytes: Math.max(0, +by || 0), total: Math.max(0, +tot || 0), limit: LIMIT, meta: m ? JSON.parse(m) : null, protected: !!pw });
       }
       case "sync": {
         const { keyCol, rows } = b;
@@ -31,8 +36,10 @@ module.exports = async (req, res) => {
         const map = new Map(); let skipped = 0, dups = 0;
         rows.forEach(r => { const k = String(r[keyCol] == null ? "" : r[keyCol]).trim(); if (!k) { skipped++; return; } if (map.has(k)) dups++; map.set(k, norm(r)); });
         const keys = [...map.keys()];
-        let old = [], bytes = 0;
-        if (keys.length) { const o = await rc([["HMGET", HASH, ...keys], ["GET", BYTES]]); old = o[0]; bytes = Math.max(0, +o[1] || 0); }
+        if (!keys.length) return res.json({ new: 0, updated: 0, unchanged: 0, skipped, dups, changes: [], bytes: 0, limit: LIMIT, warn: "" });
+        const o = await rc([["HMGET", H, ...keys], ["GET", B], ["GET", T], ["GET", M]]);
+        const old = o[0], bytes = Math.max(0, +o[1] || 0), total = Math.max(0, +o[2] || 0), meta = o[3] ? JSON.parse(o[3]) : null;
+        if (meta && meta.keyCol && meta.keyCol !== keyCol) throw new Error("This workspace is matched by \"" + meta.keyCol + "\". Use that column, or clear the saved data first to match by \"" + keyCol + "\".");
         let neu = 0, upd = 0, same = 0, delta = 0; const writes = [], changes = [];
         keys.forEach((k, i) => {
           const nv = JSON.stringify(map.get(k)), ov = old[i];
@@ -40,31 +47,40 @@ module.exports = async (req, res) => {
           else if (ov !== nv) {
             upd++; writes.push(k, nv); delta += nv.length - ov.length;
             if (changes.length < 300) {
-              const o = JSON.parse(ov), n = map.get(k), cs = [];
-              new Set([...Object.keys(o), ...Object.keys(n)]).forEach(c => { if ((o[c] == null ? "" : o[c]) !== (n[c] == null ? "" : n[c])) cs.push({ c, o: o[c] == null ? "" : o[c], n: n[c] == null ? "" : n[c] }); });
+              const a = JSON.parse(ov), n = map.get(k), cs = [];
+              new Set([...Object.keys(a), ...Object.keys(n)]).forEach(c => { const x = a[c] == null ? "" : a[c], y = n[c] == null ? "" : n[c]; if (x !== y) cs.push({ c, o: x, n: y }); });
               changes.push({ key: k, cs });
             }
           } else same++;
         });
-        if (bytes + delta > LIMIT) { const e = new Error("Storage limit reached: " + ((bytes + delta) / 1048576).toFixed(1) + " MB needed, limit is " + (LIMIT / 1048576).toFixed(0) + " MB."); e.full = true; e.kind = "size"; throw e; }
-        if (writes.length) await rc([["HSET", HASH, ...writes], ["INCRBY", BYTES, String(delta)]]);
-        const used = bytes + delta, pct = Math.round(used / LIMIT * 100);
-        return res.json({ new: neu, updated: upd, unchanged: same, skipped, dups, changes, bytes: used, limit: LIMIT,
+        if (total + delta > LIMIT) throw fail("Storage limit reached: " + ((total + delta) / 1048576).toFixed(1) + " MB needed, limit is " + (LIMIT / 1048576).toFixed(0) + " MB.", { full: true, kind: "size" });
+        if (writes.length) {
+          const cmds = [];
+          if (!meta) cmds.push(["SET", M, JSON.stringify({ keyCol, columns: [], updatedAt: new Date().toISOString() })]);
+          cmds.push(["HSET", H, ...writes], ["INCRBY", B, String(delta)], ["INCRBY", T, String(delta)]);
+          await rc(cmds);
+        }
+        const used = total + delta, pct = Math.round(used / LIMIT * 100);
+        return res.json({ new: neu, updated: upd, unchanged: same, skipped, dups, changes, bytes: bytes + delta, limit: LIMIT,
           warn: pct >= 90 ? "Storage is " + pct + "% full (" + (used / 1048576).toFixed(1) + " of " + (LIMIT / 1048576).toFixed(0) + " MB). Clear old data or upgrade your Upstash plan soon." : "" });
       }
       case "meta": {
-        const [m] = await rc([["GET", META]]);
+        const [m] = await rc([["GET", M]]);
         const o = m ? JSON.parse(m) : {};
         const columns = [...new Set([...(o.columns || []), ...(b.columns || [])])];
-        await rc([["SET", META, JSON.stringify({ keyCol: b.keyCol, columns, updatedAt: new Date().toISOString() })]]);
+        await rc([["SET", M, JSON.stringify({ keyCol: o.keyCol || b.keyCol, columns, updatedAt: new Date().toISOString() })]]);
         return res.json({ ok: true });
       }
       case "page": {
-        const [r] = await rc([["HSCAN", HASH, String(b.cursor || "0"), "COUNT", "300"]]);
-        const rows = []; for (let i = 1; i < r[1].length; i += 2) rows.push(JSON.parse(r[1][i]));
-        return res.json({ cursor: String(r[0]), rows });
+        const [r] = await rc([["HSCAN", H, String(b.cursor || "0"), "COUNT", "300"]]);
+        const items = []; for (let i = 0; i < r[1].length; i += 2) items.push([r[1][i], JSON.parse(r[1][i + 1])]);
+        return res.json({ cursor: String(r[0]), items });
       }
-      case "clear": { await rc([["DEL", HASH, META, BYTES]]); return res.json({ ok: true }); }
+      case "clear": {
+        const [by] = await rc([["GET", B]]);
+        const cmds = [["DEL", H, M, B]]; if (+by > 0) cmds.push(["DECRBY", T, String(+by)]);
+        await rc(cmds); return res.json({ ok: true });
+      }
       default: return res.status(400).json({ error: "Unknown action" });
     }
   } catch (e) {
