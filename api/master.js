@@ -1,5 +1,6 @@
 // Vercel serverless function: user accounts + each user's private saved master data in Upstash Redis.
 // Env vars added by the Upstash integration: KV_REST_API_URL, KV_REST_API_TOKEN.
+// Admin: ADMIN_USERS = comma separated usernames that get the admin panel (list users, clear data, reset password, delete user).
 // Optional env vars: SIGNUP_CODE (invite code needed to create an account), USER_LIMIT_MB (per user, default 50), STORAGE_LIMIT_MB (all users, default 256).
 const crypto = require("crypto");
 const T = "lmx:total:bytes";
@@ -20,7 +21,11 @@ async function rc(cmds) {
   if (!r.ok || !Array.isArray(j)) throw new Error((j && j.error) || "Storage error " + r.status);
   return j.map(x => { if (x.error) throw new Error(x.error); return x.result; });
 }
-async function newSession(u) { const t = crypto.randomBytes(24).toString("hex"); await rc([["SET", "lms:" + t, u, "EX", "2592000"]]); return t; }
+async function newSession(u) { const t = crypto.randomBytes(24).toString("hex"); await rc([["SET", "lms:" + t, u, "EX", "2592000"], ["SADD", "lmss:" + u, t], ["EXPIRE", "lmss:" + u, "2592000"]]); return t; }
+const isAdmin = u => String(process.env.ADMIN_USERS || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean).includes(u);
+async function scan(pattern) { let cur = "0"; const out = []; for (let i = 0; i < 60; i++) { const [r] = await rc([["SCAN", cur, "MATCH", pattern, "COUNT", "500"]]); cur = String(r[0]); out.push(...r[1]); if (cur === "0") break; } return out; }
+async function revoke(u) { const [toks] = await rc([["SMEMBERS", "lmss:" + u]]); const cmds = (toks || []).map(t => ["DEL", "lms:" + t]); cmds.push(["DEL", "lmss:" + u]); await rc(cmds); }
+async function wipe(u) { const [by] = await rc([["GET", "lm:" + u + ":bytes"]]); const cmds = [["DEL", "lm:" + u + ":data", "lm:" + u + ":meta", "lm:" + u + ":bytes"]]; if (+by > 0) cmds.push(["DECRBY", T, String(+by)]); await rc(cmds); }
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -55,10 +60,10 @@ module.exports = async (req, res) => {
     if (!ws) return res.status(401).json({ error: "Please sign in." });
     const H = "lm:" + ws + ":data", M = "lm:" + ws + ":meta", B = "lm:" + ws + ":bytes";
     switch (b.action) {
-      case "logout": { await rc([["DEL", "lms:" + tok]]); return res.json({ ok: true }); }
+      case "logout": { await rc([["DEL", "lms:" + tok], ["SREM", "lmss:" + ws, tok]]); return res.json({ ok: true }); }
       case "status": {
         const [n, by, m, tot] = await rc([["HLEN", H], ["GET", B], ["GET", M], ["GET", T]]);
-        return res.json({ user: ws, count: n || 0, bytes: Math.max(0, +by || 0), userLimit: USERLIM, total: Math.max(0, +tot || 0), limit: LIMIT, meta: m ? JSON.parse(m) : null });
+        return res.json({ user: ws, admin: isAdmin(ws), count: n || 0, bytes: Math.max(0, +by || 0), userLimit: USERLIM, total: Math.max(0, +tot || 0), limit: LIMIT, meta: m ? JSON.parse(m) : null });
       }
       case "sync": {
         const { keyCol, rows } = b;
@@ -111,6 +116,33 @@ module.exports = async (req, res) => {
         const [by] = await rc([["GET", B]]);
         const cmds = [["DEL", H, M, B]]; if (+by > 0) cmds.push(["DECRBY", T, String(+by)]);
         await rc(cmds); return res.json({ ok: true });
+      }
+      /* ---- admin only ---- */
+      case "admin_list": case "admin_clear": case "admin_delete": case "admin_reset": {
+        if (!isAdmin(ws)) return res.status(403).json({ error: "Admin only." });
+        if (b.action === "admin_list") {
+          const accounts = (await scan("lmu:*")).map(k => k.slice(4)), datas = (await scan("lm:*:data")).map(k => k.slice(3, -5));
+          const names = [...new Set([...accounts, ...datas])].filter(okName).slice(0, 300), users = [];
+          for (let i = 0; i < names.length; i += 100) {
+            const part = names.slice(i, i + 100), cmds = []; part.forEach(n => cmds.push(["HLEN", "lm:" + n + ":data"], ["GET", "lm:" + n + ":bytes"], ["GET", "lmu:" + n]));
+            const o = await rc(cmds);
+            part.forEach((n, k) => { const acc = o[k * 3 + 2]; users.push({ u: n, count: o[k * 3] || 0, bytes: Math.max(0, +o[k * 3 + 1] || 0), hasAccount: !!acc, created: acc ? JSON.parse(acc).created : "", admin: isAdmin(n) }); });
+          }
+          users.sort((a, c) => c.bytes - a.bytes);
+          const [tot] = await rc([["GET", T]]);
+          return res.json({ users, total: Math.max(0, +tot || 0), limit: LIMIT });
+        }
+        const t = uname(b.target); if (!okName(t)) throw new Error("Invalid username.");
+        if (b.action === "admin_clear") { await wipe(t); return res.json({ ok: true }); }
+        if (b.action === "admin_delete") {
+          if (isAdmin(t)) throw new Error("Admin accounts cannot be deleted here.");
+          await wipe(t); await revoke(t); await rc([["DEL", "lmu:" + t, "lmf:" + t]]); return res.json({ ok: true });
+        }
+        const np = String(b.password || ""); if (np.length < 6) throw new Error("Password must be at least 6 characters.");
+        const [rec] = await rc([["GET", "lmu:" + t]]); if (!rec) throw new Error("This user has no account.");
+        const o = JSON.parse(rec), salt = crypto.randomBytes(16).toString("hex");
+        await rc([["SET", "lmu:" + t, JSON.stringify({ salt, hash: hashPw(np, salt), created: o.created, reset: new Date().toISOString() })]]);
+        await revoke(t); return res.json({ ok: true });
       }
       default: return res.status(400).json({ error: "Unknown action" });
     }

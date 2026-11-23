@@ -109,6 +109,7 @@ main{padding:18px;overflow:auto}
    <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
    <div class="row" style="margin-top:6px"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
    <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear my saved data</button>
+   <button class="alt" id="adm" style="margin-top:6px;width:100%;display:none">Admin panel (all users)</button>
    <p class="sub" style="margin:6px 0 0">Upload once and your records are saved. Next time just sign in and search. Same SKU/ASIN with changed values are replaced, new ones are added. Clearing affects only your own data.</p>
   </div>
  </div></details>
@@ -518,7 +519,7 @@ function lockKey(){const k=$("ckey");if(lockedKey&&cols.includes(lockedKey))k.va
  $("ckn").textContent=lockedKey?`Locked to "${lockedKey}" because your saved records use it. To use another column, press Clear my saved data first.`:"Choose once: this column identifies each product (SKU is usual)."}
 async function cloudStatus(){
  if(!TOKEN){showAuth();return null}
- try{const s=await cloud({action:"status"});lockedKey=(s.meta&&s.meta.keyCol)||"";
+ try{const s=await cloud({action:"status"});lockedKey=(s.meta&&s.meta.keyCol)||"";$("adm").style.display=s.admin?"":"none";
   $("cst").textContent=`${s.count.toLocaleString()} records saved (${fmtB(s.bytes)} of your ${fmtB(s.userLimit)}). All users together: ${fmtB(s.total)} of ${fmtB(s.limit)}.`;lockKey();return s}
  catch(e){$("cst").textContent="Saved data: "+e.message;return null}
 }
@@ -602,6 +603,19 @@ $("vlast").onclick=()=>{if(!rows.length)return;const k=lockedKey||$("ckey").valu
  if(lastKeys&&lastKeys.size&&rowsFromCloud)rows.forEach((r,i)=>{if(lastKeys.has(String(r[k]==null?"":r[k]).trim()))viewIdx.add(i)});else rows.forEach((r,i)=>viewIdx.add(i));
  viewMode="last";pick.clear();$("q").value="";renderRecs();render()};
 $("vall").onclick=()=>{if(!rows.length)return;viewMode="all";pick.clear();$("q").value="";renderRecs();render()};
+async function adminOpen(){
+ try{const r=await cloud({action:"admin_list"});
+  const btn=(a,u,t)=>`<button class="alt" data-act="${a}" data-u="${esc(u)}" style="padding:2px 8px;margin:1px">${t}</button>`;
+  const body=r.users.map(u=>`<tr><td>${esc(u.u)}${u.admin?" <b>(admin)</b>":""}${u.hasAccount?"":" <i>(no account)</i>"}</td><td>${u.count.toLocaleString()}</td><td>${fmtB(u.bytes)}</td><td>${esc((u.created||"").slice(0,10))}</td><td>${btn("clear",u.u,"Clear data")}${u.hasAccount&&!u.admin?btn("pw",u.u,"Reset password")+btn("del",u.u,"Delete user"):""}</td></tr>`).join("");
+  modal("Admin: all users",`<p>All users together use <b>${fmtB(r.total)}</b> of ${fmtB(r.limit)}. You see only counts and sizes, never the records.</p><div style="overflow:auto"><table class="tb"><tr><th>User</th><th>Records</th><th>Size</th><th>Created</th><th>Actions</th></tr>${body||'<tr><td colspan="5">No users yet.</td></tr>'}</table></div>`)
+ }catch(e){failPopup(e,"Admin")}
+}
+$("mb").onclick=async e=>{const b=e.target.closest("[data-act]");if(!b)return;const u=b.dataset.u,act=b.dataset.act;
+ const body={action:act==="clear"?"admin_clear":act==="del"?"admin_delete":"admin_reset",target:u};
+ if(act==="pw"){const p=prompt('New password for "'+u+'" (at least 6 characters). The user will be signed out:');if(!p)return;body.password=p}
+ else{const t=prompt((act==="del"?'DELETE the account and all data of user "':'Clear ALL saved data of user "')+u+'"? This cannot be undone.\nType the username to confirm:');if(t===null||t.trim().toLowerCase()!==u)return}
+ try{await cloud(body);await adminOpen();cloudStatus()}catch(err){failPopup(err,"Admin action")}};
+$("adm").onclick=adminOpen;
 if(TOKEN&&WS){showUser();updClr();loadSaved(false)}else showAuth();
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
