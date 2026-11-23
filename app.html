@@ -93,20 +93,30 @@ main{padding:18px;overflow:auto}
  </div></details>
 
  <details open><summary>Saved data (your Upstash, free plan)</summary><div class="body">
-  <label>Your workspace name (private; the same name on another PC shares the same data)</label>
-  <div class="row"><input type="text" id="cws" placeholder="e.g. amit-store" autocomplete="off"><button id="cwsb">Use</button></div>
-  <p class="sub" id="cst" style="margin:6px 0">Checking…</p>
-  <label>Match column (identifies each product)</label><select id="ckey"></select>
-  <p class="sub" id="ckn" style="margin:4px 0 0"></p>
-  <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
-  <div class="row" style="margin-top:6px"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
-  <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear my saved data</button>
-  <p class="sub" style="margin:6px 0 0">Upload once and the records are saved (a private workspace name was created for this browser; type the same name on another PC to share the data). Next time just open the tool and search. Same SKU/ASIN with changed values are replaced, new ones are added. Every workspace name keeps its own separate data, and clearing affects only your own workspace.</p>
+  <div id="authBox">
+   <p class="sub" style="margin:0 0 6px">Sign in to save your files and search them any day. Every user sees only his own data.</p>
+   <label>Username</label><input type="text" id="lu" autocomplete="username" style="width:100%">
+   <label>Password</label><input type="password" id="lp" autocomplete="current-password" style="width:100%">
+   <label>Invite code (only to create an account, if the owner gave you one)</label><input type="text" id="lc" autocomplete="off" style="width:100%">
+   <div class="row" style="margin-top:6px"><button id="llog">Sign in</button><button class="alt" id="lreg">Create account</button></div>
+   <p class="sub" id="lerr" style="color:#9b1c1c;margin:6px 0 0"></p>
+  </div>
+  <div id="sdBox" style="display:none">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Signed in as <b id="uname"></b></span><button class="alt" id="lout" style="padding:3px 10px">Sign out</button></div>
+   <p class="sub" id="cst" style="margin:6px 0">Checking…</p>
+   <label>Match column (identifies each product)</label><select id="ckey"></select>
+   <p class="sub" id="ckn" style="margin:4px 0 0"></p>
+   <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
+   <div class="row" style="margin-top:6px"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
+   <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear my saved data</button>
+   <p class="sub" style="margin:6px 0 0">Upload once and your records are saved. Next time just sign in and search. Same SKU/ASIN with changed values are replaced, new ones are added. Clearing affects only your own data.</p>
+  </div>
  </div></details>
 
  <details open><summary>Records: search &amp; select to print</summary><div class="body">
   <input type="text" id="q" placeholder="Search SKU, ASIN, barcode, name… labels update instantly">
   <div class="row" style="margin-top:6px"><button class="alt" id="selAll">Select all results</button><button class="alt" id="selNone">Clear selection</button></div>
+  <div class="row" style="margin-top:6px"><button class="alt" id="vlast">Show last uploaded file</button><button class="alt" id="vall">Show all records</button></div>
   <div class="cols" id="recList" style="margin-top:8px;max-height:260px"></div>
   <p class="sub" id="recInfo" style="margin:6px 0 0"></p>
  </div></details>
@@ -178,7 +188,7 @@ main{padding:18px;overflow:auto}
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let rows=[];
+let rows=[],viewMode="none",viewIdx=null,lastKeys=null;
 let cols=[];
 let sel=new Set();
 
@@ -304,7 +314,7 @@ function recText(r){
 }
 function updInfo(){
  if(!rows.length){$("recInfo").textContent="Upload an Excel file first.";return}
- $("recInfo").textContent=$("q").value.trim()?`${hits.length} record(s) found and shown. Use "Select all results" to keep them selected, then search more.`:pick.size?`${pick.size} record(s) selected: only these will print.`:`Nothing selected: all ${rows.length} records will print.`;
+ $("recInfo").textContent=$("q").value.trim()?`${hits.length} record(s) found and shown. Use "Select all results" to keep them selected, then search more.`:pick.size?`${pick.size} record(s) selected: only these will print.`:`${viewMode==="none"?"Nothing shown yet. Search above, or press Show all records / Show last uploaded file.":"Showing "+(viewMode==="all"?rows.length:(viewIdx?viewIdx.size:rows.length))+" records."}`;
 }
 function renderRecs(){
  const q=$("q").value.trim().toLowerCase();
@@ -322,7 +332,7 @@ $("recList").addEventListener("input",e=>{
  updInfo();rq();
 });
 $("selAll").onclick=()=>{if(!hits.length)return;hits.forEach(i=>pick.set(i,copyOf(i)));$("q").value="";renderRecs();render()};
-$("selNone").onclick=()=>{pick.clear();$("q").value="";renderRecs();render()};
+$("selNone").onclick=()=>{pick.clear();$("q").value="";viewMode="none";renderRecs();render()};
 
 let calib=false;
 function CAL(w,h,sh){let t="";for(let y=5;y<h;y+=5)t+=`<div style="position:absolute;left:0;top:${y}mm;width:3mm;border-top:.2mm solid #000"></div><div style="position:absolute;left:4mm;top:${y-1.3}mm;font:6pt Arial">${y}</div>`;
@@ -346,7 +356,7 @@ function render(full){
  paper.style.cssText="background:none;box-shadow:none;padding:0;width:fit-content";$("sheet").style.cssText="display:block";
  const keys=$("useCustom").checked?["__c"]:[...tplSel].filter(k=>TEMPLATES[k]);
  let items=[],total=0,limited=false;const MAX=full===true?1e9:40;
- const use=$("q").value.trim()?new Set(hits):pick.size?new Set(pick.keys()):null;
+ const use=$("q").value.trim()?new Set(hits):pick.size?new Set(pick.keys()):viewMode==="all"?null:viewMode==="last"?(viewIdx||new Set()):new Set();
  const fill=m2&&($("rep").checked||!!$("q").value.trim());
  const ffv=($("ff").value||"Arial").replace(/['";<>]/g,"");
  const pd=$("ip").value!==""?`;padding:${+$("ip").value}mm`:"";
@@ -362,7 +372,10 @@ function render(full){
    items.push(`<div class="lbl ${cls} ${$("guide").checked?"guide":""}" style="width:${lw}mm;height:${lh}mm;font-size:${fs}pt;font-family:'${ffv}',Arial,sans-serif;flex:none${sh}${pd}">${inner}</div>`);
   }
  }
- const n=total;let pages=1,html;
+ const n=total;
+ if(!n&&rows.length&&!calib){const qq=$("q").value.trim();$("sheet").innerHTML='<div class="empty">'+(qq?"No record matches your search.":'Search a SKU / ASIN / barcode in the box on the left to see its label.<br>Or press <b>Show last uploaded file</b> / <b>Show all records</b> to print everything at once.')+'</div>';
+  $("count").textContent=qq?"No match":rows.length.toLocaleString()+" records ready. Labels appear when you search.";return}
+ let pages=1,html;
  if(calib)items=Array(per).fill(CAL(lw,lh,sh));
  html="";pages=0;
  for(let i=0;i<items.length;i+=per){pages++;
@@ -477,73 +490,74 @@ async function printNow(){
  const v=document.getElementById("val");if(v){v.focus();v.select()}}
 window.addEventListener("afterprint",()=>{document.body.classList.remove("pimode");$("pimgs").innerHTML=""});
 $("pdfBtn").onclick=toPDF;$("printBtn").onclick=printNow;
-/* ---- saved data (Upstash Redis through /api/master): one private workspace per user ---- */
+/* ---- saved data (Upstash Redis through /api/master): every signed-in user sees only his own data ---- */
 const fmtB=b=>b>=1048576?(b/1048576).toFixed(1)+" MB":Math.round(b/1024)+" KB";
 function modal(t,h){$("mt").textContent=t;$("mb").innerHTML=h;$("modal").classList.add("on")}
 $("mx").onclick=()=>$("modal").classList.remove("on");
-let WS=localStorage.getItem("ls_ws")||"",lockedKey="",rowsFromCloud=false;
-if(!WS){WS="ws-"+Math.random().toString(36).slice(2,10);localStorage.setItem("ls_ws",WS)}
-const wsClean=v=>String(v||"").toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40);
+let TOKEN=localStorage.getItem("ls_token")||"",WS=localStorage.getItem("ls_user")||"",lockedKey="",rowsFromCloud=false;
 const idbOpen=()=>new Promise((res,rej)=>{const o=indexedDB.open("ls_cache",1);o.onupgradeneeded=()=>o.result.createObjectStore("kv");o.onsuccess=()=>res(o.result);o.onerror=()=>rej(o.error)});
 const idbGet=async k=>{try{const d=await idbOpen();return await new Promise(r=>{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}};
 const idbSet=async(k,v)=>{try{const d=await idbOpen();await new Promise(r=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=r;t.onerror=r})}catch(e){}};
-async function cloud(body,silent){
- for(let t=0;t<2;t++){
-  let r;try{r=await fetch("/api/master",{method:"POST",headers:{"Content-Type":"application/json","x-app-key":sessionStorage.getItem("ls_pw")||""},body:JSON.stringify(Object.assign({ws:WS},body))})}catch(e){throw new Error("Cannot reach the server: "+e.message)}
-  if(r.status===401){if(silent)throw new Error("Locked: click Reload saved data and enter the password");const k=prompt("Enter the app password");if(k===null)throw new Error("Password required");sessionStorage.setItem("ls_pw",k);continue}
-  if(r.status===404)throw new Error("Storage API not found. Upload the api folder to GitHub and redeploy.");
-  const j=await r.json().catch(()=>({error:"Bad response ("+r.status+")"}));
-  if(!r.ok||j.error){const e=new Error(j.error||"Request failed");e.full=!!j.full;e.kind=j.kind;throw e}
-  return j}
- throw new Error("Wrong password")
+async function req(body,useToken){
+ let r;try{r=await fetch("/api/master",{method:"POST",headers:Object.assign({"Content-Type":"application/json"},useToken&&TOKEN?{Authorization:"Bearer "+TOKEN}:{}),body:JSON.stringify(body)})}catch(e){throw new Error("Cannot reach the server: "+e.message)}
+ if(r.status===404)throw new Error("Storage API not found. Upload the api folder to GitHub and redeploy.");
+ const j=await r.json().catch(()=>({error:"Bad response ("+r.status+")"}));
+ if(r.status===401&&useToken){signedOut();throw new Error("Please sign in again.")}
+ if(!r.ok||j.error){const e=new Error(j.error||"Request failed");e.full=!!j.full;e.kind=j.kind;throw e}
+ return j
 }
+const cloud=b=>req(b,true);
+function showAuth(){$("authBox").style.display="";$("sdBox").style.display="none"}
+function showUser(){$("authBox").style.display="none";$("sdBox").style.display="";$("uname").textContent=WS}
+function signedOut(){TOKEN="";WS="";lastKeys=null;lockedKey="";localStorage.removeItem("ls_token");localStorage.removeItem("ls_user");clearRows();showAuth()}
 function failPopup(e,what){
- if(e.full)modal(e.kind==="requests"?"Storage request limit reached":"Storage is full",`<p>${esc(e.message)}</p><p>${e.kind==="requests"?"The request limit of your Upstash plan is used up. Try again later or upgrade the plan.":"Use <b>Clear my saved data</b> to free space, or upgrade your Upstash plan, then sync again."}</p>`);
+ if(e.full)modal(e.kind==="requests"?"Storage request limit reached":e.kind==="user"?"Your storage limit is reached":"Storage is full",`<p>${esc(e.message)}</p><p>${e.kind==="requests"?"The request limit of the Upstash plan is used up. Try again later or upgrade the plan.":"Use <b>Clear my saved data</b> to free space, or ask the owner to raise the limit or upgrade the Upstash plan."}</p>`);
  else modal(what+" failed",`<p>${esc(e.message)}</p>`)
 }
 function lockKey(){const k=$("ckey");if(lockedKey&&cols.includes(lockedKey))k.value=lockedKey;k.disabled=!!lockedKey;
- $("ckn").textContent=lockedKey?`Locked to "${lockedKey}" because the saved records use it. To use another column, press Clear my saved data first.`:"Choose once: this column identifies each product (SKU is usual)."}
-async function cloudStatus(silent){
- if(!WS){$("cst").textContent="Type a workspace name above and press Use to save and search your data.";return null}
- try{const s=await cloud({action:"status"},silent);lockedKey=(s.meta&&s.meta.keyCol)||"";
-  $("cst").textContent=`Workspace "${WS}": ${s.count.toLocaleString()} records (${fmtB(s.bytes)}). All workspaces together use ${fmtB(s.total)} of ${fmtB(s.limit)}.`+(s.protected?"":" API is not password-protected (set APP_PASSWORD in Vercel).");lockKey();return s}
+ $("ckn").textContent=lockedKey?`Locked to "${lockedKey}" because your saved records use it. To use another column, press Clear my saved data first.`:"Choose once: this column identifies each product (SKU is usual)."}
+async function cloudStatus(){
+ if(!TOKEN){showAuth();return null}
+ try{const s=await cloud({action:"status"});lockedKey=(s.meta&&s.meta.keyCol)||"";
+  $("cst").textContent=`${s.count.toLocaleString()} records saved (${fmtB(s.bytes)} of your ${fmtB(s.userLimit)}). All users together: ${fmtB(s.total)} of ${fmtB(s.limit)}.`;lockKey();return s}
  catch(e){$("cst").textContent="Saved data: "+e.message;return null}
 }
 function afterLoad(fromFile){
- if(fromFile)rowsFromCloud=false;
+ if(fromFile){rowsFromCloud=false;viewMode="none";viewIdx=null;if(WS)idbSet("local_last_"+WS,{rows,info:$("fileInfo").textContent})}
  const k=$("ckey");k.innerHTML=cols.map(c=>`<option>${esc(c)}</option>`).join("");
  const sv=localStorage.getItem("ls_kc");k.value=cols.includes(sv)?sv:(cols.find(c=>/^sku/i.test(c))||cols.find(c=>/asin/i.test(c))||cols[0]||"");lockKey();
- if(fromFile){idbSet("local_last",{rows,info:$("fileInfo").textContent});if($("cauto").checked&&rows.length)cloudSync()}
+ if(fromFile){if(!TOKEN)$("lerr").textContent="Sign in to save this file and search it any day.";else if($("cauto").checked&&rows.length)cloudSync()}
 }
 $("ckey").onchange=()=>localStorage.setItem("ls_kc",$("ckey").value);
-function clearRows(){rows=[];cols=[];sel=new Set();hay=null;cop.clear();pick.clear();buildCols();renderRecs();render();$("fileInfo").textContent="No file uploaded yet."}
+function clearRows(){rows=[];cols=[];sel=new Set();hay=null;cop.clear();pick.clear();viewMode="none";viewIdx=null;rowsFromCloud=false;buildCols();renderRecs();render();$("fileInfo").textContent="No file uploaded yet."}
 function install(data,s){
  const present=new Set();data.forEach(r=>Object.keys(r).forEach(c=>present.add(c)));
  const order=((s.meta&&s.meta.columns)||[]).filter(c=>present.has(c));present.forEach(c=>{if(!order.includes(c))order.push(c)});
- rows=data;cols=order;applyOrder();sel=initSel();rowsFromCloud=true;
- $("fileInfo").textContent=`Saved data loaded: ${rows.length.toLocaleString()} records. Search to print.`;
+ rows=data;cols=order;applyOrder();sel=initSel();rowsFromCloud=true;viewMode="none";viewIdx=null;
+ $("fileInfo").textContent=`Your saved data: ${rows.length.toLocaleString()} records. Search to see a label.`;
  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();afterLoad(false)
 }
 async function loadLocal(){
- const c=await idbGet("local_last");if(!c||!c.rows||!c.rows.length)return false;
- rows=c.rows;cols=Object.keys(rows[0]);applyOrder();sel=initSel();rowsFromCloud=false;
+ const c=await idbGet("local_last_"+WS);if(!c||!c.rows||!c.rows.length)return false;
+ rows=c.rows;cols=Object.keys(rows[0]);applyOrder();sel=initSel();rowsFromCloud=false;viewMode="none";viewIdx=null;
  $("fileInfo").textContent="Restored from this browser: "+(c.info||"last file")+" (not saved in storage)";
  hay=null;cop.clear();buildCols();pick.clear();$("q").value="";renderRecs();render();afterLoad(false);return true
 }
 async function loadSaved(manual){
- if(!WS)return;const b=$("cload"),t0=b.textContent;b.disabled=true;
+ if(!TOKEN)return;const b=$("cload"),t0=b.textContent;b.disabled=true;
  try{
-  const s=await cloudStatus(!manual);if(!s){if(!rows.length)await loadLocal();b.disabled=false;return}
-  if(!s.count){if(rowsFromCloud)clearRows();if(!rows.length&&await loadLocal()){b.disabled=false;return}if(manual)modal("Nothing saved yet","<p>Upload an Excel file. It is saved automatically, and next time you only need to search.</p>");b.disabled=false;return}
+  const s=await cloudStatus();if(!s){if(TOKEN&&!rows.length)await loadLocal();b.disabled=false;return}
+  if(!s.count){if(rowsFromCloud)clearRows();if(!rows.length&&await loadLocal()){b.disabled=false;return}if(manual)modal("Nothing saved yet","<p>Upload an Excel file. It is saved to your account automatically, and next time you only need to search.</p>");b.disabled=false;return}
+  if(!lastKeys){const lk=await idbGet("last_"+WS);if(lk)lastKeys=new Set(lk)}
   const ver=WS+"|"+((s.meta&&s.meta.updatedAt)||"")+"|"+s.count;let data=null;const c=await idbGet("cache_"+WS);if(c&&c.ver===ver)data=c.rows;
   if(!data){const mp=new Map();let cur="0";do{b.textContent=`Loading ${mp.size}/${s.count}`;const r=await cloud({action:"page",cursor:cur});r.items.forEach(([k,v])=>mp.set(k,v));cur=r.cursor}while(cur!=="0");data=[...mp.values()];await idbSet("cache_"+WS,{ver,rows:data})}
   install(data,s)
- }catch(e){failPopup(e,"Load");if(!rows.length)await loadLocal()}
+ }catch(e){if(TOKEN){failPopup(e,"Load");if(!rows.length)await loadLocal()}}
  b.disabled=false;b.textContent=t0
 }
 async function cloudSync(){
- if(!WS)return modal("Workspace needed","<p>Type a workspace name (any private name, like your store name) and press Use.</p>");
- if(!rows.length||rowsFromCloud)return modal("No new file","<p>Upload an Excel file first. The data shown now is already the saved data.</p>");
+ if(!TOKEN)return modal("Sign in first","<p>Sign in (or create an account) to save your file.</p>");
+ if(!rows.length||rowsFromCloud)return modal("No new file","<p>Upload an Excel file first. The data shown now is already your saved data.</p>");
  const b=$("csync"),t0=b.textContent;b.disabled=true;
  try{
   const st=await cloud({action:"status"});lockedKey=(st.meta&&st.meta.keyCol)||"";const kc=lockedKey||$("ckey").value;
@@ -556,24 +570,39 @@ async function cloudSync(){
    const r=await cloud({action:"sync",keyCol:kc,rows:rows.slice(i,j)});
    tot.n+=r.new;tot.u+=r.updated;tot.s+=r.unchanged;tot.k+=r.skipped;tot.d+=r.dups;r.changes.forEach(x=>{if(ch.length<400)ch.push(x)});warn=r.warn||warn;i=j}
   await cloud({action:"meta",keyCol:kc,columns:cols});
+  lastKeys=new Set(rows.map(r=>String(r[kc]==null?"":r[kc]).trim()).filter(Boolean));await idbSet("last_"+WS,[...lastKeys]);
   const flat=[];ch.forEach(x=>x.cs.forEach(c=>flat.push([x.key,c.c,c.o,c.n])));
-  modal(warn?"Saved: storage almost full":"Saved to storage",
+  modal(warn?"Saved: storage almost full":"Saved to your account",
    `<p><b>${tot.n}</b> new · <b>${tot.u}</b> updated (old values replaced) · <b>${tot.s}</b> unchanged`+(tot.k?` · ${tot.k} skipped (empty ${esc(kc)})`:"")+(tot.d?` · ${tot.d} repeated ${esc(kc)} in the file`:"")+`</p>`
-   +`<p>Now you can search any record here, today or any other day, without uploading again.</p>`
+   +`<p>Search any record to see its label, or use <b>Show last uploaded file</b> to print this whole file.</p>`
    +(warn?`<p style="color:#9b1c1c"><b>${esc(warn)}</b></p>`:"")
    +(flat.length?`<p><b>Changed values</b>${flat.length>=400?" (first 400 shown)":""}</p><table class="tb"><tr><th>${esc(kc)}</th><th>Column</th><th>Old</th><th>New</th></tr>${flat.slice(0,400).map(x=>"<tr>"+x.map(v=>`<td>${esc(v)}</td>`).join("")+"</tr>").join("")}</table>`:"<p>No existing record had changes.</p>"));
   b.disabled=false;b.textContent=t0;await loadSaved(false);return
- }catch(e){failPopup(e,"Save")}
+ }catch(e){if(TOKEN)failPopup(e,"Save")}
  b.disabled=false;b.textContent=t0;cloudStatus()
 }
 $("csync").onclick=cloudSync;$("cload").onclick=()=>loadSaved(true);
-$("cwsb").onclick=()=>{const v=wsClean($("cws").value);if(v.length<3)return modal("Workspace name","<p>Use at least 3 letters or numbers (a-z, 0-9, - or _). Pick a name only your team knows: anyone who types the same name can see its data.</p>");
- WS=v;localStorage.setItem("ls_ws",v);$("cws").value=v;lockedKey="";updClr();loadSaved(true)};
-$("cws").onkeydown=e=>{if(e.key==="Enter")$("cwsb").click()};
+async function doAuth(kind){
+ const b=$(kind==="register"?"lreg":"llog");$("lerr").textContent="";b.disabled=true;
+ try{const j=await req({action:kind,username:$("lu").value,password:$("lp").value,code:$("lc").value.trim()},false);
+  const keep=rows.length&&!rowsFromCloud;TOKEN=j.token;WS=j.user;localStorage.setItem("ls_token",TOKEN);localStorage.setItem("ls_user",WS);$("lp").value="";
+  showUser();updClr();
+  if(keep&&confirm("Save the file you just uploaded to your account now?"))await cloudSync();else{if(keep)clearRows();await loadSaved(true)}
+ }catch(e){$("lerr").textContent=e.message}
+ b.disabled=false
+}
+$("llog").onclick=()=>doAuth("login");$("lreg").onclick=()=>doAuth("register");
+$("lp").onkeydown=e=>{if(e.key==="Enter")doAuth("login")};
+$("lout").onclick=async()=>{try{await req({action:"logout"},true)}catch(e){}signedOut()};
 const updClr=()=>{$("cclr").textContent=WS?`Clear my saved data (${WS})`:"Clear my saved data"};
-$("cclr").onclick=async()=>{if(!WS)return;const t=prompt('This deletes ALL saved data of workspace "'+WS+'" only. Other workspaces are not touched.\nThis cannot be undone. Type the workspace name to confirm:');if(t===null||wsClean(t)!==WS){if(t!==null)modal("Not cleared","<p>The name did not match, so nothing was deleted.</p>");return}
- try{await cloud({action:"clear"});await idbSet("cache_"+WS,null);await idbSet("local_last",null);lockedKey="";if(rowsFromCloud)clearRows();await cloudStatus();lockKey()}catch(e){failPopup(e,"Clear")}};
-$("cws").value=WS;updClr();if(WS)loadSaved(false);else cloudStatus();
+$("cclr").onclick=async()=>{if(!TOKEN)return;const t=prompt('This deletes ALL saved data of user "'+WS+'" only. Other users are not touched.\nThis cannot be undone. Type your username to confirm:');
+ if(t===null||t.trim().toLowerCase()!==WS){if(t!==null)modal("Not cleared","<p>The name did not match, so nothing was deleted.</p>");return}
+ try{await cloud({action:"clear"});await idbSet("cache_"+WS,null);await idbSet("local_last_"+WS,null);await idbSet("last_"+WS,null);lastKeys=null;lockedKey="";if(rowsFromCloud)clearRows();await cloudStatus();lockKey()}catch(e){failPopup(e,"Clear")}};
+$("vlast").onclick=()=>{if(!rows.length)return;const k=lockedKey||$("ckey").value;viewIdx=new Set();
+ if(lastKeys&&lastKeys.size&&rowsFromCloud)rows.forEach((r,i)=>{if(lastKeys.has(String(r[k]==null?"":r[k]).trim()))viewIdx.add(i)});else rows.forEach((r,i)=>viewIdx.add(i));
+ viewMode="last";pick.clear();$("q").value="";renderRecs();render()};
+$("vall").onclick=()=>{if(!rows.length)return;viewMode="all";pick.clear();$("q").value="";renderRecs();render()};
+if(TOKEN&&WS){showUser();updClr();loadSaved(false)}else showAuth();
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
@@ -587,7 +616,7 @@ $("calBtn").onclick=()=>{$("mode").value="page";calib=true;printNow()};
 let SAVED={};try{SAVED=JSON.parse(localStorage.getItem("ls_settings")||"{}")}catch(e){}
 const initSel=()=>new Set(cols.filter(c=>(SAVED.sel||[]).includes(c)||!(SAVED.order||[]).includes(c)));
 const applyOrder=()=>{const o=SAVED.order||[];cols.sort((a,b)=>{const x=o.indexOf(a),y=o.indexOf(b);return(x<0?999:x)-(y<0?999:y)})};
-function saveSettings(){try{const f={};document.querySelectorAll("aside input[id],aside select[id]").forEach(e=>{if(e.type==="file"||["q","cws","ckey"].includes(e.id))return;f[e.id]=e.type==="checkbox"?e.checked:e.value});
+function saveSettings(){try{const f={};document.querySelectorAll("aside input[id],aside select[id]").forEach(e=>{if(e.type==="file"||e.type==="password"||["q","cws","ckey","lu","lc"].includes(e.id))return;f[e.id]=e.type==="checkbox"?e.checked:e.value});
  SAVED={f,sel:[...sel],cfg:colCfg,order:cols.slice(),tpl:[...tplSel]};localStorage.setItem("ls_settings",JSON.stringify(SAVED))}catch(e){}}
 if(SAVED.f)Object.keys(SAVED.f).forEach(id=>{const e=document.getElementById(id);if(!e||e.type==="file")return;if(e.type==="checkbox")e.checked=!!SAVED.f[id];else if(e.tagName!=="SELECT"||[...e.options].some(o=>o.value===SAVED.f[id]))e.value=SAVED.f[id]});
 if(SAVED.tpl&&SAVED.tpl.length){tplSel.clear();SAVED.tpl.forEach(t=>tplSel.add(t))}
