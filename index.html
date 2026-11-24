@@ -24,6 +24,8 @@ section{padding:48px 0;border-top:1px solid var(--line)}
 details{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:10px}summary{cursor:pointer;font-weight:600}
 footer{padding:30px 0;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
 @media(max-width:760px){.hero{grid-template-columns:1fr}}
+input{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+label{display:block;margin:10px 0 3px;font-size:13px;color:var(--mute)}button.btn{font:inherit;font-weight:600;cursor:pointer}
 </style></head><body><div class="w">
 <nav><a class="logo" href="/">Label Studio</a><span><a href="/app" style="margin-right:18px;text-decoration:none;font-weight:600">Excel labels</a><a href="/barcode" style="margin-right:18px;text-decoration:none;font-weight:600">Real-time barcode</a><a class="btn o" href="/app">Open the tool</a></span></nav>
 <header class="hero"><div>
@@ -31,6 +33,19 @@ footer{padding:30px 0;color:var(--mute);font-size:14px;border-top:1px solid var(
 <p class="lead">Create MRP and barcode labels from any spreadsheet. Pick your columns, choose a template, and print on rolls or A4. Your data never leaves your browser.</p>
 <div class="cta"><a class="btn" href="/app">Start making labels</a><a class="btn o" href="#pricing">See pricing</a></div></div>
 </header>
+<section id="login"><h2>Sign in</h2>
+<div class="c" style="max-width:440px">
+ <div id="fin"><p id="lnote" style="margin:0 0 6px;color:var(--mute)">Sign in to use the tools and save your files. Every user sees only his own data.</p>
+  <label for="lu">Username</label><input id="lu" autocomplete="username">
+  <label for="lp">Password</label><input type="password" id="lp" autocomplete="current-password">
+  <label for="lc">Invite code (only to create an account, if the owner gave you one)</label><input id="lc" autocomplete="off">
+  <p style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 8px"><button class="btn" id="llog">Sign in</button><button class="btn o" id="lreg">Create account</button></p>
+  <p id="lerr" style="color:#9b1c1c;margin:0"></p></div>
+ <div id="fout" style="display:none"><p style="margin-top:0">Signed in as <b id="who"></b></p>
+  <p style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="/app">Open Excel labels</a><a class="btn o" href="/barcode">Real-time barcode</a></p>
+  <p style="margin-bottom:0"><button class="btn o" id="lout">Sign out</button></p></div>
+</div></section>
+
 <section><h2>Everything you need for label printing</h2><div class="g">
 <div class="c"><h3>Works with any Excel</h3><p>Upload .xlsx or .csv. Every column becomes an attribute you can show, rename, bold or reorder.</p></div>
 <div class="c"><h3>MRP and barcode templates</h3><p>Several ready layouts, plus your own HTML and CSS for a fully custom look.</p></div>
@@ -49,4 +64,24 @@ footer{padding:30px 0;color:var(--mute);font-size:14px;border-top:1px solid var(
 <details><summary>Is my data uploaded anywhere?</summary><p>No. Your Excel file is read and turned into labels inside your browser, and is gone when you close or refresh the page.</p></details>
 <details><summary>Which printers work?</summary><p>Any printer that can print from a browser, including thermal label printers. Set your paper size and print with margins set to None and scale 100%.</p></details>
 <details><summary>Can I print 2 labels side by side on a roll?</summary><p>Yes. Choose per-paper mode, set the paper width, label size and labels per row.</p></details></section>
-<footer>© Label Studio. All rights reserved.</footer></div></body></html>
+<footer>© Label Studio. All rights reserved.</footer></div><script>
+const $=id=>document.getElementById(id),TK=()=>localStorage.getItem("ls_token"),US=()=>localStorage.getItem("ls_user");
+const fromApp=/[?&]login=1/.test(location.search);
+async function api(b,tok){const r=await fetch("/api/master",{method:"POST",headers:Object.assign({"Content-Type":"application/json"},tok?{Authorization:"Bearer "+tok}:{}),body:JSON.stringify(b)});
+ if(r.status===404)throw new Error("The server part is not set up yet (api folder missing).");
+ const j=await r.json().catch(()=>({error:"Bad response ("+r.status+")"}));if(!r.ok||j.error)throw new Error(j.error||"Request failed");return j}
+function view(){const on=!!TK();$("fin").style.display=on?"none":"";$("fout").style.display=on?"":"none";$("who").textContent=US()||""}
+function clearLogin(){localStorage.removeItem("ls_token");localStorage.removeItem("ls_user")}
+async function go(kind){const b=$(kind==="register"?"lreg":"llog");$("lerr").textContent="";b.disabled=true;
+ try{const j=await api({action:kind,username:$("lu").value,password:$("lp").value,code:$("lc").value.trim()});
+  localStorage.setItem("ls_token",j.token);localStorage.setItem("ls_user",j.user);$("lp").value="";
+  if(fromApp)location.replace("/app");else view()}
+ catch(e){$("lerr").textContent=e.message}b.disabled=false}
+$("llog").onclick=()=>go("login");$("lreg").onclick=()=>go("register");
+$("lp").onkeydown=e=>{if(e.key==="Enter")go("login")};
+$("lout").onclick=async()=>{try{await api({action:"logout"},TK())}catch(e){}clearLogin();view()};
+view();
+if(TK())api({action:"status"},TK()).catch(e=>{if(/sign in/i.test(e.message)){clearLogin();view()}});
+if(fromApp){$("lnote").textContent="Please sign in to open the tool. Every user sees only his own data.";$("login").scrollIntoView()}
+</script>
+</body></html>

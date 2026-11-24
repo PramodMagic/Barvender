@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>if(!localStorage.getItem("ls_token"))location.replace("/?login=1")</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Label Studio – MRP & Barcode</title>
@@ -93,14 +94,6 @@ main{padding:18px;overflow:auto}
  </div></details>
 
  <details open><summary>Saved data (your Upstash, free plan)</summary><div class="body">
-  <div id="authBox">
-   <p class="sub" style="margin:0 0 6px">Sign in to save your files and search them any day. Every user sees only his own data.</p>
-   <label>Username</label><input type="text" id="lu" autocomplete="username" style="width:100%">
-   <label>Password</label><input type="password" id="lp" autocomplete="current-password" style="width:100%">
-   <label>Invite code (only to create an account, if the owner gave you one)</label><input type="text" id="lc" autocomplete="off" style="width:100%">
-   <div class="row" style="margin-top:6px"><button id="llog">Sign in</button><button class="alt" id="lreg">Create account</button></div>
-   <p class="sub" id="lerr" style="color:#9b1c1c;margin:6px 0 0"></p>
-  </div>
   <div id="sdBox" style="display:none">
    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Signed in as <b id="uname"></b></span><button class="alt" id="lout" style="padding:3px 10px">Sign out</button></div>
    <p class="sub" id="cst" style="margin:6px 0">Checking…</p>
@@ -508,8 +501,8 @@ async function req(body,useToken){
  return j
 }
 const cloud=b=>req(b,true);
-function showAuth(){$("authBox").style.display="";$("sdBox").style.display="none"}
-function showUser(){$("authBox").style.display="none";$("sdBox").style.display="";$("uname").textContent=WS}
+function showAuth(){location.replace("/?login=1")}
+function showUser(){$("sdBox").style.display="";$("uname").textContent=WS}
 function signedOut(){TOKEN="";WS="";lastKeys=null;lockedKey="";localStorage.removeItem("ls_token");localStorage.removeItem("ls_user");clearRows();showAuth()}
 function failPopup(e,what){
  if(e.full)modal(e.kind==="requests"?"Storage request limit reached":e.kind==="user"?"Your storage limit is reached":"Storage is full",`<p>${esc(e.message)}</p><p>${e.kind==="requests"?"The request limit of the Upstash plan is used up. Try again later or upgrade the plan.":"Use <b>Clear my saved data</b> to free space, or ask the owner to raise the limit or upgrade the Upstash plan."}</p>`);
@@ -519,7 +512,7 @@ function lockKey(){const k=$("ckey");if(lockedKey&&cols.includes(lockedKey))k.va
  $("ckn").textContent=lockedKey?`Locked to "${lockedKey}" because your saved records use it. To use another column, press Clear my saved data first.`:"Choose once: this column identifies each product (SKU is usual)."}
 async function cloudStatus(){
  if(!TOKEN){showAuth();return null}
- try{const s=await cloud({action:"status"});lockedKey=(s.meta&&s.meta.keyCol)||"";$("adm").style.display=s.admin?"":"none";
+ try{const s=await cloud({action:"status"});lockedKey=(s.meta&&s.meta.keyCol)||"";$("adm").style.display=s.admin?"":"none";$("uname").textContent=WS+(s.admin?" (admin)":"");
   $("cst").textContent=`${s.count.toLocaleString()} records saved (${fmtB(s.bytes)} of your ${fmtB(s.userLimit)}). All users together: ${fmtB(s.total)} of ${fmtB(s.limit)}.`;lockKey();return s}
  catch(e){$("cst").textContent="Saved data: "+e.message;return null}
 }
@@ -527,7 +520,7 @@ function afterLoad(fromFile){
  if(fromFile){rowsFromCloud=false;viewMode="none";viewIdx=null;if(WS)idbSet("local_last_"+WS,{rows,info:$("fileInfo").textContent})}
  const k=$("ckey");k.innerHTML=cols.map(c=>`<option>${esc(c)}</option>`).join("");
  const sv=localStorage.getItem("ls_kc");k.value=cols.includes(sv)?sv:(cols.find(c=>/^sku/i.test(c))||cols.find(c=>/asin/i.test(c))||cols[0]||"");lockKey();
- if(fromFile){if(!TOKEN)$("lerr").textContent="Sign in to save this file and search it any day.";else if($("cauto").checked&&rows.length)cloudSync()}
+ if(fromFile&&TOKEN&&$("cauto").checked&&rows.length)cloudSync()
 }
 $("ckey").onchange=()=>localStorage.setItem("ls_kc",$("ckey").value);
 function clearRows(){rows=[];cols=[];sel=new Set();hay=null;cop.clear();pick.clear();viewMode="none";viewIdx=null;rowsFromCloud=false;buildCols();renderRecs();render();$("fileInfo").textContent="No file uploaded yet."}
@@ -583,17 +576,6 @@ async function cloudSync(){
  b.disabled=false;b.textContent=t0;cloudStatus()
 }
 $("csync").onclick=cloudSync;$("cload").onclick=()=>loadSaved(true);
-async function doAuth(kind){
- const b=$(kind==="register"?"lreg":"llog");$("lerr").textContent="";b.disabled=true;
- try{const j=await req({action:kind,username:$("lu").value,password:$("lp").value,code:$("lc").value.trim()},false);
-  const keep=rows.length&&!rowsFromCloud;TOKEN=j.token;WS=j.user;localStorage.setItem("ls_token",TOKEN);localStorage.setItem("ls_user",WS);$("lp").value="";
-  showUser();updClr();
-  if(keep&&confirm("Save the file you just uploaded to your account now?"))await cloudSync();else{if(keep)clearRows();await loadSaved(true)}
- }catch(e){$("lerr").textContent=e.message}
- b.disabled=false
-}
-$("llog").onclick=()=>doAuth("login");$("lreg").onclick=()=>doAuth("register");
-$("lp").onkeydown=e=>{if(e.key==="Enter")doAuth("login")};
 $("lout").onclick=async()=>{try{await req({action:"logout"},true)}catch(e){}signedOut()};
 const updClr=()=>{$("cclr").textContent=WS?`Clear my saved data (${WS})`:"Clear my saved data"};
 $("cclr").onclick=async()=>{if(!TOKEN)return;const t=prompt('This deletes ALL saved data of user "'+WS+'" only. Other users are not touched.\nThis cannot be undone. Type your username to confirm:');
