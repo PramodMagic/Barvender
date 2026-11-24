@@ -17,7 +17,7 @@
 .top a.l:hover{background:var(--brand2)}.top a.on{background:var(--brand2);color:var(--brand)}
 
 body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
-
+.app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
 aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow-y:auto;max-height:calc(100vh - 48px);position:sticky;top:48px}
 h1{font-size:20px;margin:0 0 2px}
 .sub{color:var(--mute);margin:0 0 14px;font-size:13px}
@@ -69,39 +69,10 @@ main{padding:18px;overflow:auto}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{position:static;max-height:none}}
 @media print{.top{display:none}html,body{height:auto}.app{min-height:0}main{overflow:visible}
  .empty{display:none}
- body{background:#fff}.app{display:block}.ribbon,.bar{display:none}
+ body{background:#fff}.app{display:block}aside,.bar{display:none}
  main{padding:0}.paper{box-shadow:none;margin:0;width:auto!important;padding:0!important}
  .lbl.guide{outline:none}.pg{box-shadow:none;margin:0}
 }
-
-/* ---- Excel-style ribbon ---- */
-.app{display:block}
-.ribbon{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:48px;z-index:15;box-shadow:0 2px 6px rgba(0,0,0,.06)}
-.rtabs{display:flex;gap:2px;padding:0 12px;background:#f3f7f4;border-bottom:1px solid var(--line);overflow-x:auto}
-.rtabs button{background:none;color:var(--ink);border:0;border-bottom:3px solid transparent;border-radius:0;padding:7px 14px;font-weight:600;font-size:13.5px;white-space:nowrap}
-.rtabs button.on{color:var(--brand);border-bottom-color:var(--brand);background:#fff}
-.rtabs button:hover{background:#e6efe9}
-#rbody.collapsed{display:none}
-.rpanel{display:none;padding:8px 6px;overflow-x:auto;align-items:stretch;min-height:104px}
-.rpanel.on{display:flex}
-.rpanel.tall .cols{max-height:300px}
-.grp{display:flex;flex-direction:column;justify-content:space-between;padding:0 12px;border-right:1px solid var(--line);flex:none}
-.grp .gb{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;flex:1}
-.gl{text-align:center;font-size:11.5px;color:var(--mute);margin-top:6px;white-space:nowrap}
-.ribbon label{margin:0 0 2px;font-size:11.5px;white-space:nowrap}
-.ribbon .f{display:flex;flex-direction:column}
-.ribbon .v,.ribbon .v2{display:grid;gap:4px;align-content:start}
-.ribbon .v2{grid-template-columns:1fr 1fr}
-.ribbon input[type=text],.ribbon input[type=number],.ribbon select{width:auto;min-width:70px;padding:4px 6px}
-.ribbon input[type=number]{width:84px}
-.ribbon button{padding:4px 10px;font-size:13px}
-.ribbon textarea{width:100%;min-height:90px}
-.ribbon .drop{padding:10px 16px;white-space:normal;min-width:150px}
-.tpls{display:flex;flex-wrap:wrap;gap:2px 14px;max-width:420px;max-height:96px;overflow:auto;font-size:13px}
-.tpls div{width:100%;font-weight:600;margin-top:2px}.tpls .chk{margin:0;white-space:nowrap}
-#colList{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:6px;border:0;padding:0}
-#colList .crow{border:1px solid var(--line);border-radius:6px;padding:6px 8px}
-.ribbon [hidden]{display:none!important}
 </style>
 <style id="pageStyle"></style>
 <style id="userCss"></style>
@@ -111,116 +82,93 @@ main{padding:18px;overflow:auto}
 <div id="modal"><div class="mbox"><h3 id="mt" style="margin:0 0 8px"></h3><div id="mb"></div><p style="text-align:right;margin:12px 0 0"><button id="mx">Close</button></p></div></div>
 <nav class="top"><a class="logo" href="/">Label Studio</a><a class="l" href="/">Home</a><a class="l on" href="/app">Excel labels</a><a class="l" href="/barcode">Real-time barcode</a></nav>
 <div class="app">
-<div class="ribbon">
- <div class="rtabs">
-  <button class="on" data-tab="home">Home</button><button data-tab="layout">Layout</button><button data-tab="barcode">Barcode</button><button data-tab="cols">Columns</button><button data-tab="recs">Records</button><button data-tab="acct">Account</button><button data-tab="adv">Advanced</button>
-  <button id="rcol" title="Collapse / expand the ribbon" style="margin-left:auto">⌃</button>
- </div>
- <div id="rbody">
+<aside>
+ <h1>Label Studio</h1>
+ <p class="sub">Create MRP and barcode labels from Excel.</p>
 
- <div class="rpanel on" id="rp-home">
-  <div class="grp"><div class="gb">
-    <div class="drop" id="drop" tabindex="0"><b>Upload Excel / CSV</b><br><small>click or drop a file here</small><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div>
-    <div class="v"><button class="alt" id="sampleBtn">Sample Excel</button><p class="sub" id="fileInfo" style="margin:0;max-width:200px;white-space:normal">No file uploaded yet.</p></div>
-   </div><div class="gl">File</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f" style="min-width:260px"><label>Search SKU, ASIN, barcode, name</label><input type="text" id="q" placeholder="Type to see the label instantly" style="width:260px"><p class="sub" id="recInfo" style="margin:2px 0 0;max-width:260px;white-space:normal"></p></div>
-    <div class="v2"><button class="alt" id="selAll">Select all results</button><button class="alt" id="selNone">Clear selection</button><button class="alt" id="vlast">Show last uploaded file</button><button class="alt" id="vall">Show all records</button></div>
-   </div><div class="gl">Find &amp; show labels</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Font family</label><input type="text" id="ff" list="fonts" value="Arial" style="width:150px"><datalist id="fonts"><option value="Arial"><option value="Arial Narrow"><option value="Aptos Narrow"><option value="Aptos"><option value="Calibri"><option value="Cambria"><option value="Candara"><option value="Consolas"><option value="Courier New"><option value="Georgia"><option value="Impact"><option value="Segoe UI"><option value="Tahoma"><option value="Times New Roman"><option value="Trebuchet MS"><option value="Verdana"><option value="Roboto"><option value="Open Sans"></datalist></div>
-    <div class="f"><label>Size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div>
-   </div><div class="gl">Font</div></div>
-  <div class="grp"><div class="gb">
-    <div id="tplList" class="tpls"></div>
-    <div class="f"><label>Separator</label><input type="text" id="sep" value=" : " style="width:60px"></div>
-   </div><div class="gl">Templates (tick one or more)</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Auto-fit text</label><select id="fit"><option value="shrink">Shrink only if it does not fit</option><option value="grow" selected>Fit label: shrink or enlarge</option><option value="off">Off (use my sizes exactly)</option></select></div>
-    <label class="chk"><input type="checkbox" id="guide" checked> Guide border</label>
-   </div><div class="gl">Fit</div></div>
- </div>
+ <details open><summary>1. Upload Excel</summary><div class="body">
+  <div class="drop" id="drop" tabindex="0">Drop an Excel / CSV file here or click to browse
+   <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div>
+  <p class="sub" id="fileInfo" style="margin:8px 0 6px">No file uploaded yet.</p>
+  <button class="alt" id="sampleBtn">Download sample Excel</button>
+ </div></details>
 
- <div class="rpanel" id="rp-layout">
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Paper</label><select id="paper"><option value="210,297">A4</option><option value="148,210">A5</option><option value="216,279">Letter</option><option value="custom" selected>Custom / Roll</option></select></div>
-    <div class="gb" id="customPaper"><div class="f"><label>Width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div class="f"><label>Height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
-    <div class="f"><label>Layout</label><select id="mode"><option value="page">Per paper (roll / thermal)</option><option value="flow">Sheet (A4 etc.)</option></select></div>
-    <label class="chk"><input type="checkbox" id="auto" checked> Auto layout</label>
-   </div><div class="gl">Paper</div></div>
-  <div class="grp"><div class="gb" id="pageOpts">
-    <div class="f"><label>Labels per row</label><input type="number" id="cpr" value="2" min="1"></div>
-    <div class="f"><label>Rows per paper</label><input type="number" id="rpp" value="1" min="1"></div>
-    <label class="chk"><input type="checkbox" id="rep"> Repeat same label to fill paper</label>
-    <div class="v"><button class="alt" id="pre1">1 label / paper</button><button class="alt" id="pre2">2 labels / paper</button></div>
-   </div><div class="gl">Arrange (manual mode)</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Label width mm</label><input type="number" id="lw" value="50"></div>
-    <div class="f"><label>Label height mm</label><input type="number" id="lh" value="38"></div>
-    <div class="f"><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div>
-    <div class="f"><label>Margin mm</label><input type="number" id="mg" value="0"></div>
-    <div class="f"><label>Inner padding mm</label><input type="number" id="ip" step="0.5" value="1.5"></div>
-   </div><div class="gl">Label</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Shift X mm</label><input type="number" id="sx" value="0" step="0.1"></div>
-    <div class="f"><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div>
-    <button class="alt" id="calBtn">Print calibration test label</button>
-   </div><div class="gl">Printer alignment</div></div>
- </div>
+ <details open><summary>Saved data (your Upstash, free plan)</summary><div class="body">
+  <div id="sdBox" style="display:none">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Signed in as <b id="uname"></b></span><button class="alt" id="lout" style="padding:3px 10px">Sign out</button></div>
+   <p class="sub" id="cst" style="margin:6px 0">Checking…</p>
+   <label>Match column (identifies each product)</label><select id="ckey"></select>
+   <p class="sub" id="ckn" style="margin:4px 0 0"></p>
+   <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
+   <div class="row" style="margin-top:6px"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
+   <button class="alt" id="cclr" style="margin-top:6px;width:100%">Clear my saved data</button>
+   <button class="alt" id="adm" style="margin-top:6px;width:100%;display:none">Admin panel (all users)</button>
+   <p class="sub" style="margin:6px 0 0">Upload once and your records are saved. Next time just sign in and search. Same SKU/ASIN with changed values are replaced, new ones are added. Clearing affects only your own data.</p>
+  </div>
+ </div></details>
 
- <div class="rpanel" id="rp-barcode">
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Barcode type</label><select id="bcType"><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option><option>ITF14</option></select></div>
-    <label class="chk"><input type="checkbox" id="bcText" checked> Show number below barcode</label>
-   </div><div class="gl">Barcode</div></div>
-  <div class="grp"><div class="gb">
-    <div class="f"><label>Height mm</label><input type="number" id="bh" value="10" step="0.5"></div>
-    <div class="f"><label>Width % of label</label><input type="number" id="bw" value="92" min="20" max="100"></div>
-    <div class="f"><label>Number size (pt)</label><input type="number" id="bn" value="8" step="0.5"></div>
-   </div><div class="gl">Size</div></div>
- </div>
+ <details open><summary>Records: search &amp; select to print</summary><div class="body">
+  <input type="text" id="q" placeholder="Search SKU, ASIN, barcode, name… labels update instantly">
+  <div class="row" style="margin-top:6px"><button class="alt" id="selAll">Select all results</button><button class="alt" id="selNone">Clear selection</button></div>
+  <div class="row" style="margin-top:6px"><button class="alt" id="vlast">Show last uploaded file</button><button class="alt" id="vall">Show all records</button></div>
+  <div class="cols" id="recList" style="margin-top:8px;max-height:260px"></div>
+  <p class="sub" id="recInfo" style="margin:6px 0 0"></p>
+ </div></details>
 
- <div class="rpanel tall" id="rp-cols">
-  <div class="grp"><div class="gb" style="flex-direction:column;align-items:stretch">
-    <div class="f"><label>Name column</label><select id="mName"></select></div>
-    <div class="f"><label>MRP / price column</label><select id="mMrp"></select></div>
-    <div class="f"><label>Barcode column</label><select id="mBar"></select></div>
-    <div class="f"><label>Copies (qty) column</label><select id="mQty"></select></div>
-    <div class="gb"><button class="alt" id="allOn">Select all</button><button class="alt" id="allOff">Clear all</button></div>
-   </div><div class="gl">Map columns</div></div>
-  <div class="grp" style="flex:1;min-width:0"><div class="gb" style="display:block"><div id="colList" class="cols"></div></div><div class="gl">Show, label, size %, B I U, colors, lines, order</div></div>
- </div>
+ <details open><summary>2. Columns: show, label, size %, bold, lines, order</summary><div class="body">
+  <div class="row"><button class="alt" id="allOn">Select all</button><button class="alt" id="allOff">Clear all</button></div>
+  <div class="cols" id="colList" style="margin-top:8px"></div>
+  <label>Name column</label><select id="mName"></select>
+  <label>MRP / price column</label><select id="mMrp"></select>
+  <label>Barcode column</label><select id="mBar"></select>
+  <label>Copies (qty) column</label><select id="mQty"></select>
+ </div></details>
 
- <div class="rpanel tall" id="rp-recs">
-  <div class="grp" style="flex:1;min-width:0"><div class="gb" style="display:block"><div class="cols" id="recList"></div></div><div class="gl">Search results: tick records, set copies</div></div>
- </div>
+ <details open><summary>3. Templates</summary><div class="body">
+  <label>Tick every template you want for each record on one paper:</label>
+  <div id="tplList"></div>
+  <label>Barcode type</label>
+  <select id="bcType"><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option><option>ITF14</option></select>
+  <label>Separator between label and value</label><input type="text" id="sep" value=" : ">
+  <label class="chk"><input type="checkbox" id="bcText" checked> Show number below barcode</label>
+ </div></details>
 
- <div class="rpanel" id="rp-acct">
-  <div class="grp"><div id="sdBox" style="display:none">
-   <div class="gb">
-    <div class="v"><span>Signed in as <b id="uname"></b></span><button class="alt" id="lout">Sign out</button></div>
-    <div class="f" style="max-width:240px"><label>Saved data</label><p class="sub" id="cst" style="margin:0;white-space:normal">Checking…</p></div>
-    <div class="f"><label>Match column</label><select id="ckey"></select><p class="sub" id="ckn" style="margin:2px 0 0;max-width:240px;white-space:normal"></p></div>
-    <label class="chk"><input type="checkbox" id="cauto" checked> Save / update automatically when I upload a file</label>
-    <div class="v"><button class="alt" id="csync">Sync file now</button><button class="alt" id="cload">Reload saved data</button></div>
-    <div class="v"><button class="alt" id="cclr">Clear my saved data</button><button class="alt" id="adm" style="display:none">Admin panel (all users)</button></div>
-   </div></div><div class="gl">Your Upstash data (private to you)</div></div>
- </div>
+ <details open><summary>4. Paper &amp; label size</summary><div class="body">
+  <label>Layout mode</label>
+  <select id="mode"><option value="page">Per paper: fixed labels on each paper (roll / thermal)</option><option value="flow">Sheet: labels flow across the page (A4 etc.)</option></select>
+  <label class="chk" style="margin:8px 0 2px"><input type="checkbox" id="auto" checked> Auto layout: margin, labels per row and centering are set automatically</label>
+  <div id="pageOpts" style="margin-top:6px">
+   <div class="row"><div><label>Labels per row</label><input type="number" id="cpr" value="2" min="1"></div><div><label>Rows per paper</label><input type="number" id="rpp" value="1" min="1"></div></div>
+   <label class="chk"><input type="checkbox" id="rep"> Fill each paper with the same label (always on while searching)</label>
+   <div class="row" style="margin-top:6px"><button class="alt" id="pre1">1 label / paper</button><button class="alt" id="pre2">2 labels / paper</button></div>
+   <p class="sub" style="margin:6px 0 0">Paper width must be at least labels × label width + gaps. Use margin 0 on rolls.</p>
+  </div>
+  <label>Paper</label>
+  <select id="paper"><option value="210,297">A4</option><option value="148,210">A5</option><option value="216,279">Letter</option><option value="custom" selected>Custom / Roll</option></select>
+  <div class="row" id="customPaper"><div><label>Paper width mm</label><input type="number" id="pw" value="104.8" step="0.1"></div><div><label>Paper height mm</label><input type="number" id="ph" value="38" step="0.1"></div></div>
+  <div class="row"><div><label>Label width mm</label><input type="number" id="lw" value="50"></div><div><label>Label height mm</label><input type="number" id="lh" value="38"></div></div>
+  <div class="row"><div><label>Gap mm</label><input type="number" id="gap" value="2" step="0.5"></div><div><label>Paper margin mm</label><input type="number" id="mg" value="0"></div></div>
+  <div class="row"><div><label>Inner padding mm</label><input type="number" id="ip" step="0.5" value="1.5"></div><div></div></div>
+  <div class="row"><div><label>Shift X mm (alignment)</label><input type="number" id="sx" value="0" step="0.1"></div><div><label>Shift Y mm</label><input type="number" id="sy" value="0" step="0.1"></div></div>
+  <button class="alt" id="calBtn" style="margin:2px 0 8px;width:100%">Print calibration test label</button>
+  <label>Font family (type any installed font)</label><input type="text" id="ff" list="fonts" value="Arial"><datalist id="fonts"><option value="Arial"><option value="Arial Narrow"><option value="Aptos Narrow"><option value="Aptos"><option value="Calibri"><option value="Cambria"><option value="Candara"><option value="Consolas"><option value="Courier New"><option value="Georgia"><option value="Impact"><option value="Segoe UI"><option value="Tahoma"><option value="Times New Roman"><option value="Trebuchet MS"><option value="Verdana"><option value="Roboto"><option value="Open Sans"></datalist>
+  <div class="row"><div><label>Font size (pt)</label><input type="number" id="fs" value="8.5" step="0.5"></div><div><label>Barcode height mm</label><input type="number" id="bh" value="10" step="0.5"></div></div>
+  <div class="row"><div><label>Barcode width % of label</label><input type="number" id="bw" value="92" min="20" max="100"></div><div><label>Barcode number size (pt)</label><input type="number" id="bn" value="8" step="0.5"></div></div>
+  <label>Auto-fit text to the label</label>
+  <select id="fit"><option value="shrink">Shrink only if it does not fit</option><option value="grow" selected>Fit label: shrink or enlarge</option><option value="off">Off (use my sizes exactly)</option></select>
+  <label class="chk"><input type="checkbox" id="guide" checked> Show guide border in preview</label>
+ </div></details>
 
- <div class="rpanel tall" id="rp-adv">
-  <div class="grp" style="flex:1"><div class="gb" style="display:block">
-    <label>Custom HTML template. Use {{Column}} for values and {{bc:Column}} for barcodes</label>
-    <textarea id="customHtml" spellcheck="false">&lt;div class="nm"&gt;{{Product Name}}&lt;/div&gt;
+ <details><summary>5. Custom template / CSS (advanced)</summary><div class="body">
+  <label>Custom HTML template. Use {{Column}} for values and {{bc:Column}} for barcodes</label>
+  <textarea id="customHtml" spellcheck="false">&lt;div class="nm"&gt;{{Product Name}}&lt;/div&gt;
 &lt;div class="mrp"&gt;MRP Rs. {{MRP}}&lt;/div&gt;
 {{bc:Barcode}}</textarea>
-    <label class="chk"><input type="checkbox" id="useCustom"> Use custom template</label>
-    <label>Custom CSS</label>
-    <textarea id="cssBox" spellcheck="false" placeholder=".lbl{border-radius:2mm}"></textarea>
-   </div><div class="gl">Advanced</div></div>
- </div>
-
- </div>
-</div>
+  <label class="chk"><input type="checkbox" id="useCustom"> Use custom template</label>
+  <label>Custom CSS</label>
+  <textarea id="cssBox" spellcheck="false" placeholder=".lbl{border-radius:2mm}"></textarea>
+ </div></details>
+</aside>
 
 <main>
  <div class="bar">
@@ -651,8 +599,6 @@ $("mb").onclick=async e=>{const b=e.target.closest("[data-act]");if(!b)return;co
  try{await cloud(body);await adminOpen();cloudStatus()}catch(err){failPopup(err,"Admin action")}};
 $("adm").onclick=adminOpen;
 if(TOKEN&&WS){showUser();updClr();loadSaved(false)}else showAuth();
-document.querySelectorAll(".rtabs [data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".rtabs [data-tab]").forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll(".rpanel").forEach(p=>p.classList.toggle("on",p.id==="rp-"+b.dataset.tab));$("rbody").classList.remove("collapsed")});
-$("rcol").onclick=()=>$("rbody").classList.toggle("collapsed");
 let rt;const rq=()=>{clearTimeout(rt);rt=setTimeout(()=>render(),120)};
 let rollW=+$("pw").value||104.8;
 $("pw").addEventListener("input",()=>{if(+$("pw").value>+$("lw").value*1.5)rollW=+$("pw").value});
@@ -666,12 +612,12 @@ $("calBtn").onclick=()=>{$("mode").value="page";calib=true;printNow()};
 let SAVED={};try{SAVED=JSON.parse(localStorage.getItem("ls_settings")||"{}")}catch(e){}
 const initSel=()=>new Set(cols.filter(c=>(SAVED.sel||[]).includes(c)||!(SAVED.order||[]).includes(c)));
 const applyOrder=()=>{const o=SAVED.order||[];cols.sort((a,b)=>{const x=o.indexOf(a),y=o.indexOf(b);return(x<0?999:x)-(y<0?999:y)})};
-function saveSettings(){try{const f={};document.querySelectorAll(".ribbon input[id],.ribbon select[id]").forEach(e=>{if(e.type==="file"||e.type==="password"||["q","cws","ckey","lu","lc"].includes(e.id))return;f[e.id]=e.type==="checkbox"?e.checked:e.value});
+function saveSettings(){try{const f={};document.querySelectorAll("aside input[id],aside select[id]").forEach(e=>{if(e.type==="file"||e.type==="password"||["q","cws","ckey","lu","lc"].includes(e.id))return;f[e.id]=e.type==="checkbox"?e.checked:e.value});
  SAVED={f,sel:[...sel],cfg:colCfg,order:cols.slice(),tpl:[...tplSel]};localStorage.setItem("ls_settings",JSON.stringify(SAVED))}catch(e){}}
 if(SAVED.f)Object.keys(SAVED.f).forEach(id=>{const e=document.getElementById(id);if(!e||e.type==="file")return;if(e.type==="checkbox")e.checked=!!SAVED.f[id];else if(e.tagName!=="SELECT"||[...e.options].some(o=>o.value===SAVED.f[id]))e.value=SAVED.f[id]});
 if(SAVED.tpl&&SAVED.tpl.length){tplSel.clear();SAVED.tpl.forEach(t=>tplSel.add(t))}
 let svT;const svQ=()=>{clearTimeout(svT);svT=setTimeout(saveSettings,400)};
-["input","change","click"].forEach(ev=>document.querySelector(".ribbon").addEventListener(ev,svQ));
+["input","change","click"].forEach(ev=>document.querySelector("aside").addEventListener(ev,svQ));
 buildTplList();buildCols();renderRecs();render();
 </script>
 </body>
